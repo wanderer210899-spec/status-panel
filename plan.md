@@ -1,6 +1,28 @@
 # Implementation Plan — status-panel
 
-## Current Session — 2026-07-07 / Session 5 (Firefox mobile: panel/preview never render)
+## Current Session — 2026-07-07 / Session 6 (docs rewrite → image-led wiki guides)
+
+Docs-only. User: rewrite `AUTHOR.md` + `指南.md` as GitHub-wiki-style guides — trim
+trivia, ~300 words of prose (excludes code/definitions/AI-prompt), more images, teach
+usage then focus on HTML/CSS styling, include a paste-ready AI prompt. Both languages
+carry identical content (AI prompt may stay English). Git scoped to `status-panel` only.
+
+- [Completed] `git init` in `status-panel` (default branch `main`); initial commit is the
+  pre-rewrite snapshot (images left untracked). Work branch: `docs/status-panel-guides`.
+- [Completed] Rewrote both docs to the same 4-part shape: (1) set up via SP 面板 tabs,
+  (2) style — 简易 vs 高级 + tokens table + example HTML + button/badge CSS, (3) paste-ready
+  AI prompt (kept verbatim, English, with the full STYLE REFERENCE table), (4) badges +
+  "no panel?" note. English prose measured ≈300 words (code/tables/images excluded);
+  Chinese mirrors it section-for-section.
+- [Completed] Captured 6 real harness screenshots into `images/` (panel-in-chat,
+  settings-fields, settings-generate, settings-manage, style-simple, style-advanced) via
+  chrome-devtools MCP; docs reference them by relative path. User will hand-add/replace
+  pictures as desired — links resolve now so nothing is broken.
+- [Completed] README Docs list updated to describe the new guide format.
+- [ ] Commit on the branch (docs + images + README + state files). No remote configured —
+  user to add origin / open PR when ready.
+
+## 2026-07-07 / Session 5 (Firefox mobile: panel/preview never render)
 
 User report: on mobile Firefox the panel shell appears but content never renders; the
 样式 preview is empty. Desktop Chrome fine.

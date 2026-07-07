@@ -32,7 +32,7 @@ Import **`dist/status-panel.json`** into TavernHelper's **global** script tab (�
 
 ## Docs
 
-- **`AUTHOR.md`** — panel/template authoring: fields, tokens, manual status blocks, styling, porting existing HTML, the AI-styling prompt.
-- **`指南.md`** — short Chinese tutorial for card authors and players (define fields, style knobs/tokens/CSS-var reference table, how to use a finished panel).
+- **`AUTHOR.md`** — image-led guide (English): set up fields, style the panel (simple + advanced, with example HTML/CSS), the paste-ready AI-styling prompt, and badge meanings.
+- **`指南.md`** — the same guide in Chinese (mirrors `AUTHOR.md` section-for-section).
 - **`architecture.md`** — engine contract: storage layers, lifecycle states, render pipeline, bridge protocol, CSS scoping, invariants.
 - **`agent.md`**, `plan.md`, `changelog.md` — project routing and state.

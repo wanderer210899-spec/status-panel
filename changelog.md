@@ -2,6 +2,27 @@
 
 ## Recent
 
+### 2026-07-07 / Session 6 (docs → image-led wiki guides + git init)
+
+- What: Rewrote `AUTHOR.md` and `指南.md` from dev-reference docs into GitHub-wiki-style
+  guides for a non-technical audience. Same 4-part structure in both languages: set up (SP
+  面板 → 字段/生成/管理), style it (简易 vs 高级, tokens table, worked example HTML, button/badge
+  CSS), let AI write the CSS (paste-ready prompt, kept verbatim with the full STYLE
+  REFERENCE table — allowed to stay English), and badge meanings for players. Dropped the
+  old "how the panel gets filled" path table, manual-status-block section, porting guide,
+  and the long prose reference — prose is now ≈300 words per the request (code, tables,
+  images, and the AI prompt excluded from the count). Both files reference 6 screenshots in
+  a new `images/` folder (panel-in-chat, settings-fields/generate/manage, style-simple,
+  style-advanced), captured live from the harness via chrome-devtools MCP. README's Docs
+  list updated to match. Scoped a fresh git repo to `status-panel` only: `main` holds the
+  pre-rewrite snapshot; the rewrite lives on branch `docs/status-panel-guides`.
+- Why: user wants shareable, searchable, picture-first documentation on GitHub that walks a
+  card author through usage and then teaches panel styling in enough depth (with example
+  HTML) for a human or an AI to produce a full theme.
+- Verification: docs-only, no engine change. Prose word count measured programmatically
+  (fences/tables/image lines stripped) — English ≈300 words. No remote configured; user
+  will hand-add/replace images and push/open a PR when ready.
+
 ### 2026-07-07 / Session 5 (Firefox mobile: panel + preview never rendered)
 
 - What: Fixed the mobile-Firefox render failure (panel shell mounted but stayed empty;
