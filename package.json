@@ -1,0 +1,7 @@
+{
+  "name": "tavernhelper-status-block",
+  "private": true,
+  "scripts": {
+    "build": "node build.js"
+  }
+}
