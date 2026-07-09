@@ -2,6 +2,275 @@
 
 ## Recent
 
+### 2026-07-09 / Session 4 (save workflow — Pass 2 of change request: F1 persistence + F2 smart save)
+
+- What: Pass 2 of `changes/2026-07-09-mobile-css-and-save-workflow.md`, in `src/ui/panel.js` (+ header
+  CSS in `styles.js`). **F1 — no data lost between tabs.** New settings-window draft model
+  (`spPanelDraft`, `spCurrentTabEdited`, `SP_DRAFT_KEYS`): `renderPanelContent` seeds from
+  `spDraftedConfig()` (saved config + draft overlay), and the tab-switch handler + `closePanel` call
+  `spBeforeRerender()`→`spCaptureCurrentTabDraft()` before the body is replaced, so edits survive tab
+  switches **and** close/reopen. Cleared only by the new top-right **清除更改** button
+  (`spDiscardDraft`), a per-tab save (`spClearSavedTabDraft`), or reload (in-memory). **F2 — smart
+  Save.** A delegated `input`/`change` listener on the body flags dirtiness; the header shows a
+  **● 未保存** cue + 清除更改 button while unsaved edits exist (`spUpdateDirtyCue`; readonly previews
+  excluded). First-setup fields-save (simple mode, empty template) now seeds a default layout +
+  default-colour theme so the panel renders correctly immediately. Dedup: `collectTheme` delegates to
+  the new shared `spCaptureThemeFromDom`; removed the now-dead `COLOR_KEY` map in `spBindStylesTab`.
+  Rebuilt 4986→**5130** lines, `node --check` clean.
+- Why: user reported (with screenshots) that tab switches still lost progress and there was no unsaved
+  reminder — those were the deferred Pass-2 items; user said "continue to the next part". Clear-scope
+  decision (stated, not overridden): 清除更改 discards only unsaved settings-window edits; the saved
+  card is untouched and a reload restores it.
+- Docs: none beyond project-state (no iframe styling-contract or API change; `agent.md` files/symbols
+  unchanged).
+- Verify: chrome-devtools MCP on localhost:8000 (reloaded). 深度=7 + instruction survived
+  生成→字段→生成 and close/reopen; cue+Clear show on edit / hide when clean; 清除更改 reverted 深度
+  7→0 and the instruction to saved text; clean tab visit = no false cue; accent `#123456`(+hex)
+  persisted 样式→管理→样式. No Save clicked → card untouched; panel closed clean. F2 default-layout
+  path guarded to empty-template first setup (not exercised — harness character already has a template).
+
+### 2026-07-09 / Session 3 (mobile/CSS bug pass — B1–B4; F1/F2 deferred to Pass 2)
+
+- What: Pass 1 of change request `changes/2026-07-09-mobile-css-and-save-workflow.md`, all in
+  `src/ui/styles.js` + `src/ui/panel.js`. **B1** — mobile colour picker degrades to a few swatches;
+  paired every colour well with a `.sp-color-hex` text field (in `spThemeColorField` + the bare 主色
+  input) and wired two-way sync through the existing override/regen path in `spBindStylesTab`
+  (`syncHexFor`, hex↔picker). **B2** — the 生成 tab's 角色 `<select>` inherited the global
+  `input width:100%` and blew out the row; `.sp-row label` is now inline-flex and in-row
+  selects/number inputs are `width:auto`, so 深度 + 角色 share one centred row. **B3** — opacity
+  floor ≥0.8 on both surfaces: `#SP_PANEL_ID` composites `--SmartThemeBlurTintColor` over itself
+  (colour + 4 gradient layers; transparent fallbacks keep the shipped dark look identical), and the
+  in-chat `.spg-card` background went `rgba(12,14,20,.42)`→`.88`. **B4** — ST's global input styling
+  leaked onto our checkboxes/radios and displaced them; added a reset inside `#SP_PANEL_ID`
+  (`width:auto;margin:0;flex:0 0 auto;accent-color`) so 按钮折叠 (and the radios) sit beside their
+  captions. Hex field needed selector `input[type="text"].sp-color-hex` to out-specify the global
+  width rule. Rebuilt 4926→**4986** lines, `node --check` clean.
+- Why: user bug batch (screenshot + list) after the theming pass exposed translucency + leaked
+  input styling. Rewrite policy **refactor allowed**; user chose **bugs first**, so F1 (persist
+  across tabs + Clear button) and F2 (unsaved cue + default colours) are **deferred to Pass 2**
+  (tracked in plan.md Follow-Up + the change file).
+- Docs: `styles.md` + `样式.md` `.spg-card` row updated (`.42`→`.88`, ≥0.8 note). No `agent.md`
+  routing change (same files/symbols).
+- Verify: chrome-devtools MCP on localhost:8000 (reloaded build). Settings-window bg
+  `rgba(29,33,40,0.9)` → 5 opaque stacks; 生成 tab 深度/角色 one row, select 77px content-sized,
+  centres aligned; 样式 tab 7 hex fields uniform 88px with working two-way sync (`#ff0066`→标题色
+  swatch+overridden, `#00ffaa`→accent hex); 按钮折叠 checkbox 12px/margin0 at label left; narrow
+  viewport 0 internal + 0 document x-overflow; panel closed clean.
+
+### 2026-07-09 / Session 2 (settings-window + edit-modal → ST theme; concise EN/中 docs + 样式.md)
+
+- What: **(1) R2 actioned — chrome now inherits the SillyTavern theme.** The settings window
+  (`#SP_PANEL_ID`: 字段/生成/样式/管理) and the ✏ 编辑 pop-up (`.sp-edit-modal`) in `src/ui/styles.js`
+  were a fixed dark palette; converted to `--SmartThemeBlurTintColor` (surface), `--SmartThemeBodyColor`
+  (text), `--SmartThemeBorderColor` (borders), `--SmartThemeShadowColor` (shadow), `--black30a` (inset
+  fills/inputs, mirroring ST's own inputs), `--mainFontFamily` (font). Every mapping keeps the prior
+  dark literal as a fallback, so nothing regresses on a theme missing a var; subtle white highlight
+  overlays + semantic amber-warning/red-danger colors kept literal. The 编辑 pop-up uses ST vars →
+  `--sp-*` panel var → literal, **overriding S6** (it used to match the card panel) per user decision.
+  Rebuilt 4926→**4927** lines, `node --check` clean.
+- What: **(2) docs refresh.** `AUTHOR.md` + `指南.md` rewritten as concise true mirrors (~300 words
+  each, under the <400 budget) — the single SP 面板 button, four tabs, 🔄 重试 / ✏ 编辑 actions,
+  复制状态块, badges, and a brief **two-mode prompt-injection** section (appended-to-prompt vs
+  retry-only). Styling walkthrough + the embedded external-AI prompt removed → they now link to
+  `styles.md` / `styles-prompt.md`; `指南.md`'s divergent §3 dropped so the two are real mirrors.
+  New **`样式.md`** = Simplified-Chinese mirror of `styles.md` (selectors/tokens/`--sp-*`/code kept
+  byte-identical, only prose translated). `styles-prompt.md` untouched (out of scope).
+- Why: user request following the final-review R2 report + a docs pass. Change request
+  `changes/2026-07-09-theme-and-docs.md`. Decision captured via AskUserQuestion: edit pop-up matches
+  ST theme too.
+- Docs: `agent.md` edit-modal row (S6 amended), usually-ignore note (ST-themed chrome), author-docs
+  line (EN/中 mirror pairs + `样式.md`).
+- Verify: build + `node --check` clean; live harness theme check pending in-session.
+
+### 2026-07-09 / Session 1 (final review & QA pass — dead code, CSS, full browser verify)
+
+- What: Final pre-release review. **Safe fixes applied:** (1) removed ~90 lines of dead CSS from
+  `src/ui/styles.js` — the `.sp-prev-*` + preview `.sp-badge-*` block, `.sp-preset-*` preset-row
+  block, `.sp-prompt-preview`, `.sp-preset-line*` (all residue of removed preview/preset UIs; no
+  current markup emits them). (2) **Toolbar cut to SP 面板 only** per user directive — removed the
+  `SP 清除` binding from `toolbar.js` and `SP 清除`/`SP 刷新` from the dev loader JSON (clear modal
+  stays on 管理 tab 清除聊天数据). (3) `agent.md` doc drift: SPEC range → S1–S14, `{{name}}` router
+  line corrected to the S14 label token, dead-CSS/toolbar notes. Rebuilt **4926 lines** (was 5031),
+  `node --check` clean on main.js + dist.
+- Why: user request — final sweep for dead code / logic conflicts / hardcoded CSS + full
+  normal-usage verification. Change request `changes/2026-07-09-final-review-qa.md` (fix-safe /
+  report-risky policy).
+- Reported, NOT fixed (awaiting decision): **R1** value token inside an HTML attribute
+  (`style="width:{key}%"`) corrupts the attribute when empty — reproduced live; author-side 高级
+  CSS, guardrail already in `styles.md §9`, no safe engine fix. **R2** settings-window chrome uses
+  a fixed dark palette instead of ST theme vars — deliberate long-standing look, not a regression.
+- Verified NOT dead (coworker false positives, disproved at call sites): `spParseKeyValueLines`
+  (parser.js:90), `spTokenizeJson` (render.js:231), `spScopeAuthorCss`/`spCss*` (styles.js:657-658);
+  `SP_FAB_ID` + `exampleUseDefaults` intentionally retained.
+- Verification (chrome-devtools MCP, isolated Chrome :9222 → localhost:8000, st-mock-api on :3101):
+  17 desktop + 3 mobile checks, all passed. Highlights — S11 generator-removal regression clean
+  (`aiDesignNodes:0`); retry success writes per-swipe values (source:auto) and error shows 生成失败
+  badge + toast with values preserved (source:error); card whitelist holds (server fetch shows no
+  API keys, `tagStart/tagEnd` refused on save); reload persistence OK; mobile edit-modal fills
+  viewport with box on-screen + scrollable fields. Harness state reset after (mock queue/log
+  cleared, test template restored byte-exact). Coarse-pointer sizing not exercised (needs real
+  device / touch emulation).
+
+### 2026-07-08 / Session 12 (move AI-write-CSS prompt into styles.md; probe model output)
+
+- What: Moved the "Let AI write the CSS" copy-paste prompt from `AUTHOR.md §3` into `styles.md` as
+  new **§9**, making styles.md the single authoritative theme guide. Removed AUTHOR.md §3 entirely.
+  Only prompt-body edit: fixed the now-self-referential "authoritative selector list is styles.md"
+  → "the tables above (§4, §7)". Docs-only; no engine/build change.
+- Why: The external-model prompt is the recommended styling route since the in-app generator was
+  removed (Session 11); it belongs with the styling contract. User request +
+  `changes/2026-07-08-move-theme-prompt-to-styles.md`.
+- Probe (chrome-devtools MCP, isolated Chrome → localhost:8000): read live `#sp-frame` srcdoc;
+  confirmed card fields match the model tokens; rendered the model's `fs-*` output through a faithful
+  engine-pipeline copy in filled vs empty states. **Finding:** `style="width:{好感度}%"` breaks when
+  the value is empty (placeholder `<span>` injected into the attribute); output is otherwise valid.
+  Findings reported for user decision; no prompt rewrite yet (per scope). 指南.md §3 not touched.
+- Verification: docs move only — no build. Move validated by re-reading both files (no duplication,
+  AUTHOR.md still reads cleanly). Bug reproduced + screenshotted in-browser.
+- Follow-up (same session): added a **v2 prompt** below the original in `styles-prompt.md` (a new
+  standalone copy-paste file the user split out). v2 is shorter/one-shot to stop the model dropping
+  rules: one worked example carries the format, the optional `--sp-*` table is cut, and the user's
+  inputs + a 6-line MUST/NEVER checklist sit at the **end** (recency). Grounded in web research —
+  Anthropic long-context (instructions-at-end, ~30% gain) + one-shot prompting guidance. Two prompt
+  versions now coexist for A/B; styles.md §9 still holds the old wording (duplication flagged).
+
+### 2026-07-08 / Session 11 (remove in-app AI Theme Generator — S12/S13 design path retired)
+
+- What: Removed the **in-app AI Theme Generator** (the one-click "design my panel" in the 样式 →
+  高级 tab). Deleted the design `generateRaw` path (`runThemeDesignGeneration`,
+  `spBuildThemeDesignSystemPrompt`, `spStopThemeDesignGeneration`, `spStripCodeFences` in
+  generate.js), the `#sp-ai-design*` UI + all wiring + `spThemeDesignDrafts` (panel.js),
+  `buildThemePromptConst`/`SP_THEME_PROMPT_TEMPLATE` (build.js), and the `src/api/theme-prompt.md`
+  file. SPEC S12 retired; S13's tag-override removal still stands.
+- Why: user found it "incredibly difficult to get a good status panel generated inline" — the
+  in-chat model produced flat/token-dropping designs (a long-standing plan.md follow-up). Direction
+  confirmed via AskUserQuestion: remove it, keep the rest. The panel keeps three styling routes —
+  简易 (deterministic), 高级 (manual paste), and the **external-model prompt** (copy 复制状态块 →
+  run in a full model → paste; now the recommended route, documented in `AUTHOR.md`/`styles.md`).
+  Change request `changes/2026-07-08-remove-ai-theme-generator.md`.
+- Kept (shared, must not break): value generation `runStatusGeneration` (🔄 重试) and its plumbing
+  `_spGenChain`/`spResetGenChain`/`spExtractGenerateText`/`custom_api` — now the only `generateRaw`
+  site; the `designMode` key; all 简易/高级 save/preview/import.
+- Verification: rebuilt **5031 lines** (was 5346), `node --check` clean on main.js + dist; dist JSON
+  parses; **residue grep clean** across all source + main.js + dist (only docs/historical-intake
+  reference the old feature). Not re-run live — source/build/grep-level only; a follow-up harness
+  pass should confirm the 样式 tab, 简易/高级 save+render, and 🔄 重试 in the browser.
+
+### 2026-07-08 / Session 10 (styles.md styling reference; guides → tutorial-only)
+
+- What: Added **`styles.md`** — the canonical HTML/CSS reference for the rendered panel iframe
+  (all `SP_IFRAME_GLOBAL_CSS` selectors grouped by area, the ten `--sp-*` variables with
+  defaults, template tokens and the empty-value dash, `{sp_actions}` markup + `data-sp-action`
+  bridge behavior, badge sources, the `spScopeAuthorCss` scoping rules, and the base reset).
+  Trimmed `AUTHOR.md` + `指南.md` to tutorial-first, pointing their reference material at
+  `styles.md` (kept the walkthrough, one worked example, and the standalone AI-CSS prompt).
+- Why: user asked to separate the styling **reference** from the how-to guides so the exhaustive
+  selector list has one home and the guides stay readable. Docs-only; no code or build.
+- Verification: every selector/property/default in `styles.md` was quoted directly from source
+  (`SP_IFRAME_GLOBAL_CSS`, `spBuildThemeVarBlock`, `spIframeBaseCss`, `spScopeAuthorCss`,
+  `spInterpolateTemplate`, `SP_DEFAULT_ACTIONS_HTML`) — not from the prior doc tables. Surfaced
+  stale drift: the router's "`{{name}}` removed" note and the AI-prompt's "no `{{double}}` braces"
+  line predate S14; `styles.md` documents the current S14 `{{name}}`-as-label behavior.
+
+### 2026-07-08 / Session 9 (extract AI theme prompt into an editable file)
+
+- What: Moved the AI theme-generation prompt prose out of code into a dedicated, author-editable
+  file **`src/api/theme-prompt.md`** (full Chinese prompt: rules, markers, design guidance, the
+  example, self-check). `build.js` now inlines that file as the bundle constant
+  `SP_THEME_PROMPT_TEMPLATE` (with a warning if the `{{DATA_SLOTS}}` marker is missing).
+  `spBuildThemeDesignSystemPrompt` shrank to: compute per-card DATA SLOTS → load the template →
+  `split('{{DATA_SLOTS}}').join(slots)`. Removed the now-inline prose/example from generate.js and
+  the already-dead `tokenChecklist` local.
+- Why: the v2 prompt still underwhelms on a real model; tuning it was painful while buried in a
+  ~5000-line file. A dedicated file makes each pass a one-file edit + rebuild. Change request
+  `changes/2026-07-08-extract-theme-prompt.md`; author chose "dedicated file" over an in-app textbox.
+- Verification: `node build.js` clean (5346 lines, no marker warning); reconstructed OLD (array
+  assembly) vs NEW (file + split/join) for a representative field set → **byte-identical, 2175
+  chars** (pure relocation, prompt text unchanged); confirmed `SP_THEME_PROMPT_TEMPLATE` is defined
+  at bundle L14 (before its use at L3199). Not re-run live — byte-identity is the stronger guard, and
+  S12 flow (cancel/drafts/Keep&Save) is untouched.
+- Editing loop (author-facing): edit `src/api/theme-prompt.md` → `node build.js` → refresh ST tab.
+  No live file reading (bundled iframe) — the rebuild is what applies the edit. Keep `{{DATA_SLOTS}}`.
+
+- What (2nd change, **S14**): added a **`{{name}}` field-name label token** to
+  `spInterpolateTemplate` (render.js) — renders the field's name as a static label, complementary to
+  `{name}` (its value). Two-pass substitution: label pass (`{{name}}`→esc(name)) runs before the
+  value pass so `{{name}}` is fully consumed (never leaves `{value}` stray braces). Author input
+  escaped; labels always shown (no empty-dash). Reverses the old "`{{name}}` invalid" rule with a new
+  distinct meaning (label, not value). Change request `changes/2026-07-08-field-name-label-token.md`.
+- Why: author edited the theme-prompt example to use `{{心情}}` as a row label expecting it to render
+  the field name — "so fields are easy to write" (`{{心情}}：{心情}` → `心情：开心`). Needed real
+  engine support, not just an example.
+- Verification: build clean (5356 lines), `node --check` OK; 10/10 interpolation unit tests
+  (label+value, bar calc, empty→dash, plainText em-dash, value/label HTML-escaping, unknown
+  `{{foo}}` stays literal, reserved markers untouched, single-brace regression). Two-pass logic
+  confirmed in bundle (main.js L2376). Not run live; logic is pure-function verified.
+- Note: author is hand-editing `theme-prompt.md` (removed the self-check + `.sp-iframe-root`/`@import`
+  rule, added 「方案选单」). Left their prose alone — engine supports `{{name}}` regardless of prompt text.
+- Follow-up (unchanged): judging real-model output quality still needs a non-mock provider run.
+
+### 2026-07-08 / Session 8 (simplify UI + AI Theme Generator prompt v2 + cancel — S13)
+
+- What: Three changes.
+  1. **Removed 实时值 insert-helper** (样式/高级 editor): the 「插入 {name}」 dropdown + datalist +
+     its wiring, and the now-dead `spLiveTokenDatalistHtml`/`spFieldMetaText` + `.sp-insert-*` CSS.
+     The `{name}` token system is unchanged — panels still fill live values.
+  2. **Full purge of 状态块标记 (custom tag override, S13):** removed the 生成-tab tag inputs +
+     save/read wiring, the `tagStart`/`tagEnd` card keys (whitelist + `SP_CHARDEF_TEMPLATE` +
+     `SP_CONFIG_BASE`), and the `spTagPair` cfg override (now no-arg → default invisible markers).
+     Call sites in parser/generate/render/panel updated; unused `cfg` params on
+     `spStripStatusBlockFromText` / `spMarkerBlockForFields` dropped. Legacy custom-tag cards now
+     parse on the default markers only (accepted).
+  3. **AI Theme Generator prompt v2 + cancel (S12/S13):** `spBuildThemeDesignSystemPrompt` rewritten
+     — dropped the verbose value-gen field-rules block; now structured (role/target → output rules →
+     **data slots: token + type + numeric range / enum options** → required markers → design guidance
+     [bars for numbers via CSS calc, pills for enums, --sp-* vars] → **one rich example** [bar+pill+row+
+     badge+actions] → **self-check**). Added **click-to-cancel**: `runThemeDesignGeneration` takes a
+     `generation_id`; a new `spStopThemeDesignGeneration` calls `TH.stopGenerationById`; the 生成中
+     button toggles to cancel, with an `aiReqSeq` stale-guard so a late reply is discarded.
+- Why: author found the notation config confusing (change request
+  `changes/2026-07-08-simplify-remove-notation-config.md`); the v1 design prompt was too wordy/sent
+  field examples and produced weak output, and in-flight requests couldn't be cancelled
+  (bug `bugs/2026-07-08-ai-theme-generator-prompt.md`). Prompt v2 direction (type+range slots, one
+  rich example, light scaffold+self-check) chosen by the user.
+- Verification: built (5347→ lines), `node --check` clean; residue scan clean (only a doc comment).
+  Live chrome-devtools MCP on the docker-fake-api (mock) profile: both removals confirmed absent in
+  UI; **prompt v2 captured from the mock request log** (2224 chars, correct structure — `{好感度}`
+  shown as 数字 范围 0–100, others 文本, rich example + self-check present); generation completes
+  end-to-end; **cancel** verified — mid-flight abort restores the button, and a 9s-delayed late
+  reply was correctly ignored (stale-guard). NOTE: mock returns canned HTML, so **v2 output-quality
+  vs a real model is not yet evaluated** — needs a run on a real provider profile.
+
+### 2026-07-08 / Session 7 (AI Theme Generator — S12)
+
+- What: Added a one-click **AI Theme Generator** to the 样式 tab's 高级 (advanced) section.
+  A free-text box → 生成 opens a back-and-forth mini-chat with the current AI (same
+  `generateRaw` path + `custom_api` + serializer as 重试) that returns a full custom
+  panel HTML template. The request injects the panel-HTML contract (`{fieldKey}` tokens,
+  required `{sp_actions}`/`{sp_badge}` markers, `.sp-iframe-root`, the `--sp-*` vars) plus
+  the live field rules (`spBuildFieldConstraintsBlock`), so the model keeps a `{token}` for
+  every field. Generated HTML lands in the preview (visual) + the 高级 textarea (code);
+  **保留并保存 / Keep & Save** applies it and persists as ordinary `htmlTemplate`
+  (`designMode:'advanced'`) in one action; **放弃 / Discard** reverts the textarea to its
+  pre-generation content. A non-blocking ⚠ warns when the design omits a field's
+  placeholder. Mini-chat state is an in-memory per-avatar Map (`spThemeDesignDrafts`) —
+  survives closing the window, cleared on Keep/Discard/reload, never written to the card.
+  New: `runThemeDesignGeneration` + `spBuildThemeDesignSystemPrompt` + `spStripCodeFences`
+  (generate.js); generator UI in `spRenderStylesTab` + wiring in `spBindStylesTab`
+  (panel.js); `spThemeDesignDrafts` module Map (panel.js). No card-schema change
+  (`htmlTemplate` already whitelisted). SPEC amended: **S12** (a design-generation
+  `generateRaw` path, distinct from value generation; narrows S1 to value paths only).
+- Why: the non-technical author found hand-writing advanced CSS/HTML hard and hard to
+  prompt a generic AI for. Change request: `changes/2026-07-08-ai-theme-generator.md`.
+- Verification: built (`node build.js`, 5378→ lines), `node --check` clean. Full live
+  harness run via chrome-devtools MCP (loaded the dev script by enabling the
+  "Status Panel (fetch dev JS)" global tree entry; mock API at :3101): generator renders
+  in 高级 mode; 生成 hit the mock and populated preview+textarea with tokens/markers
+  intact; **Keep & Save** persisted advanced HTML (fields unchanged: 心情/好感度/新的),
+  and the in-chat panel re-rendered with the new design and interpolated values (value
+  filling intact); missing-token ⚠ fired; survive-close restored the pending draft;
+  Discard reverted to base. Harness cleanup: test card reverted to 简易, mock queue cleared.
+
 ### 2026-07-07 / Session 6 (docs → image-led wiki guides + git init)
 
 - What: Rewrote `AUTHOR.md` and `指南.md` from dev-reference docs into GitHub-wiki-style

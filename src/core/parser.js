@@ -1,14 +1,11 @@
 // ─── Main-message status-block extraction (no regex for the tag scan) ───────
 
 /**
- * Effective tag delimiters for the AI's status block.
- * Definitions may override (`tagStart`/`tagEnd`) so authors can port panels whose
- * prompts already emit e.g. `<StatusBlock>…</StatusBlock>`; empty = default markers.
+ * Tag delimiters for the AI's status block — ALWAYS the default invisible markers (S13).
+ * The former per-card `tagStart`/`tagEnd` override was removed; this takes no config.
  */
-function spTagPair(cfg) {
-  const start = cfg && typeof cfg.tagStart === 'string' && cfg.tagStart.trim() ? cfg.tagStart.trim() : MARKER_START;
-  const end = cfg && typeof cfg.tagEnd === 'string' && cfg.tagEnd.trim() ? cfg.tagEnd.trim() : MARKER_END;
-  return { start, end };
+function spTagPair() {
+  return { start: MARKER_START, end: MARKER_END };
 }
 
 function spTryExtractMarkers(text, startTag, endTag) {
@@ -86,7 +83,7 @@ function spParseKeyValueLines(inner, fields) {
  */
 function extractStatusFromMessage(text, cfg) {
   const conf = cfg || effectiveConfig();
-  const { start, end } = spTagPair(conf);
+  const { start, end } = spTagPair();
   const res = spTryExtractMarkers(text, start, end);
   if (res.ok) return res;
   if (res.error === 'json_parse') {
@@ -131,8 +128,8 @@ function spMarkerJsonPlaceholderForFields(fields) {
   return '{' + parts.join(',') + '}';
 }
 
-function spMarkerBlockForFields(fields, cfg) {
-  const { start, end } = spTagPair(cfg);
+function spMarkerBlockForFields(fields) {
+  const { start, end } = spTagPair();
   return start + spMarkerJsonPlaceholderForFields(fields) + end;
 }
 
@@ -190,7 +187,7 @@ function spBuildFullPromptContent(cfg, opts) {
     parts.push(
       '在正文全部结束后，另起一行追加且仅追加一个状态数据块（下列标记 + 一个 JSON 对象，禁止使用 markdown 代码块）。' +
         '把每个 <…> 占位符替换为当前时刻的真实值（键名保持不变，数值不加引号）：\n' +
-        spMarkerBlockForFields(cfg.fields, cfg),
+        spMarkerBlockForFields(cfg.fields),
     );
   }
   return parts.join('\n\n');

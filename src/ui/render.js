@@ -302,7 +302,7 @@ function spStripMarkersFromDisplayedMessage(messageId) {
   let row = null;
   try { row = spGetMessageRow(messageId); } catch { /* ignore */ }
 
-  const { start: tagS, end: tagE } = spTagPair(effectiveConfig());
+  const { start: tagS, end: tagE } = spTagPair();
 
   // Compute the exact marker JSON payload from saved chat text (row.message).
   // ST may strip comment delimiters in rendered HTML, leaving only the bare JSON visible;
@@ -397,15 +397,25 @@ function spStripMarkersFromDisplayedMessage(messageId) {
 }
 
 /**
- * `{name}` = live stored value. Empty/missing → a muted dash placeholder (S5): the
- * panel never shows a field's 示例值 as if it were real data. `{{name}}` default
- * tokens were removed in v3 (S4/S10) — they are no longer substituted.
+ * Two token forms per field (S14):
+ *   `{{name}}` = the field's NAME (a static label) — always shown as-is (escaped).
+ *   `{name}`   = the field's live stored VALUE. Empty/missing → a muted dash placeholder
+ *                (S5): the panel never shows a field's 示例值 as if it were real data.
+ * The label pass runs FIRST and fully consumes every `{{name}}`, so the value pass can never
+ * mistake a `{{name}}` for a `{name}` (which would otherwise leave stray braces around the value).
  */
 function spInterpolateTemplate(template, values, fields, opts) {
   const preEscapedLive = opts && opts.preEscapedLiveValues === true;
   /** Inside `<style>` bodies: never emit HTML placeholder spans (breaks CSS / scoping). */
   const plainTextPlaceholders = opts && opts.plainTextPlaceholders === true;
   let html = template || '';
+  // Label pass (S14): `{{name}}` → the field's name. Before the value pass; escaped for safety.
+  for (const f of fields || []) {
+    const name = String(f.name || '').trim();
+    if (!name) continue;
+    html = html.split('{{' + name + '}}').join(esc(name));
+  }
+  // Value pass: `{name}` → live stored value.
   for (const f of fields || []) {
     const name = String(f.name || '').trim();
     if (!name) continue;

@@ -1,9 +1,7 @@
 // ─── TavernHelper script toolbar buttons ─────────────────────────────────────
 
-const SP_TH_BUTTON_RELOAD = 'SP 重载';
-const SP_TH_BUTTON_PANEL = 'SP 面板';
-/** Opens clear-panel modal in the chat. */
-const SP_TH_BUTTON_CLEAR = 'SP 清除';
+const SP_TH_BUTTON_RELOAD = 'SP 重载'; // dev-only: button registered by the dev loader JSON, not shipped
+const SP_TH_BUTTON_PANEL = 'SP 面板'; // the only shipped toolbar button (user decision 2026-07-09)
 
 function spBindScriptToolbarButtons() {
   const TH = getTH();
@@ -35,9 +33,5 @@ function spBindScriptToolbarButtons() {
 
   bindButton(SP_TH_BUTTON_PANEL, () => {
     if (typeof window.__spOpenPanel === 'function') window.__spOpenPanel();
-  });
-
-  bindButton(SP_TH_BUTTON_CLEAR, () => {
-    if (typeof spShowClearModal === 'function') spShowClearModal();
   });
 }

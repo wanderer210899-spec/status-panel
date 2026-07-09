@@ -4,7 +4,7 @@
 
 Global TavernHelper **engine** for per-character status panels. Panel definitions live in the character card (`data.extensions.status_panel` via `writeExtensionField`) and travel with exports; engine settings (API keys, consent lists) live in TH global variables (`status_panel_engine`) and never touch cards; per-message values live in `message.data.statusPanel` via `TH.setChatMessages` + `{refresh:'none'}`. Chinese UI, English docs/code.
 
-**Locked product spec: `SPEC.md` (S1–S11).** Read it before touching prompt assembly, the card schema, or the styling model — changes must cite a SPEC ID. Full technical contract: **`architecture.md`**.
+**Locked product spec: `SPEC.md` (S1–S14; S12 retired).** Read it before touching prompt assembly, the card schema, or the styling model — changes must cite a SPEC ID. Full technical contract: **`architecture.md`**.
 
 ## Quick Start
 
@@ -22,26 +22,27 @@ Global TavernHelper **engine** for per-character status panels. Panel definition
 | Card definition CRUD + **whitelist** | `src/core/store.js` | `SP_CARD_ALLOWED_KEYS` L47, `spFilterCardKeys` ~L160, `spCharDefSave` L173 (filters patch + merged — S11), `spCharDefDelete` ~L190 |
 | Consent + lifecycle state | `src/core/store.js` | `spPanelState`/`spPanelEnabled`, `spAllow/Dismiss/DisableCharacter` (~L245-305) |
 | Merged config | `src/core/store.js` | `effectiveConfig` ~L312; card template `SP_CHARDEF_TEMPLATE` ~L61 (`retryIncludePrev`; no `regenMode`/`exampleUseDefaults`); `SP_SAMPLE_FIELDS` ~L82 |
-| Tag + parsing | `src/core/parser.js` | `spTagPair` L8, `extractStatusFromMessage` ~L87 (JSON then `键:值`) |
+| Tag + parsing | `src/core/parser.js` | `spTagPair` L7 (**no-arg → default invisible markers only, S13**; custom tags removed), `extractStatusFromMessage` ~L84 (JSON then `键:值`) |
 | Instruction builder | `src/core/parser.js` | `spBuildFullPromptContent` ~L182 (`opts.forSecondary`), `spBuildFieldConstraintsBlock` ~L144 (name/type/**示例**/description), `spMarkerJsonPlaceholderForFields` ~L105 (output block = `<descriptor>` placeholders, S4) |
 | JSON schema | `src/core/schema.js` | `statusFieldsToJsonSchema` L16 |
 | Frame deferral (Firefox-safe) | `src/utils/helpers.js` | `spDeferFrames` L54 (top-window rAF + 200ms net), `spMountIframe` L78 — never use this script's own rAF |
 | Message-data writes | `src/utils/helpers.js` | `spMergeChatMessageData` L288 (`refresh:'none'` — the invariant) |
 | Marker signature (schema-aware) | `src/utils/helpers.js` | `spMarkerSig` ~L374 — includes field names |
 | postMessage bridge | `src/utils/helpers.js` | `spInitBridge` L123 (sp-resize / sp-action retry\|edit / sp-state; validates `e.source`; no `settings`) |
-| Manual retry gen (**only** generateRaw) | `src/api/generate.js` | `runStatusGeneration` L90 (fields-empty guard, success/error writes), `buildStatusGenerationPrompts` L55 (instructions + prev + msg + schema), `spBuildPrevStatusInject` ~L33 |
+| Manual retry gen (value generateRaw) | `src/api/generate.js` | `runStatusGeneration` L221 (fields-empty guard, success/error writes), `buildStatusGenerationPrompts` L55 (instructions + prev + msg + schema), `spBuildPrevStatusInject` ~L30 |
 | CSS scoper + global sheet | `src/ui/styles.js` | `spScopeAuthorCss` ~L559, `spIframeAuthorStyleText` hoists `@import`, `spIframeBaseCss` L450 (root only), **`SP_IFRAME_GLOBAL_CSS` L468** (all chrome, `--sp-*` vars) |
 | Layout generator (简易) | `src/ui/layoutgen.js` | `spGenerateLayoutHtml` L84 (markup + bar calc + `@import` only), `spLayoutTheme` L24 (11 knobs incl. text/btn colours + `buttonsCollapsed`), `spThemeFontStack` L57, `spFontFamiliesFromUrl` |
-| Token interpolation + srcdoc | `src/ui/render.js` | `spInterpolateTemplate` L404 (empty→dash, no `{{name}}`), `spBuildIframeSrcdoc` L438 (var block + global sheet + fold-aware `{sp_actions}`), `spBuildThemeVarBlock` L518 |
+| Token interpolation + srcdoc | `src/ui/render.js` | `spInterpolateTemplate` L407 (**S14 two-pass: `{{name}}`→field name label, then `{name}`→value**; empty value→dash), `spBuildIframeSrcdoc` ~L446 (var block + global sheet + fold-aware `{sp_actions}`), `spBuildThemeVarBlock` ~L526 |
 | Retry / panel mount | `src/ui/render.js` | `spRetry` L556, `renderPanelForMessage` ~L635 |
 | Consent banner / guidance card | `src/ui/render.js` | `spSyncConsentBanner` ~L666, `spSyncGuidanceCard` ~L704 |
 | Extension-prompt injection | `src/ui/render.js` | `spSyncExtensionPrompt` L784 (always on while enabled+fields; role/depth from engine) |
 | Field adoption from first block | `src/ui/render.js` | `spAdoptFieldsFromParsedBlock` ~L878 (adopted values → each field's 示例值; re-renders open settings window) |
 | Full refresh + message events | `src/ui/render.js` | `refreshAllAssistantPanels` L809, `spSyncMarkersOnlyForMessage` L1009 (returns true when it wrote) |
-| Settings window tabs | `src/ui/panel.js` | `renderPanelContent` ~L126; 字段 `spRenderFieldsTab` ~L497 (示例值, 状态块 preview/copy); `spTemplateTokenWarnings` ~L740; 样式 `spRenderStylesTab` ~L800 + `spBindStylesTab` ~L900 (live theme, `spThemeColorField`, ↺-follow); 生成 `spRenderGenerateTab` ~L1140 + `spBindGenerateTab` ~L1265 (`spGenerateDraftConfig`, `spUpdateInjectPreview`); 管理 `spRenderManageTab`; `openPanel` |
-| Edit modal | `src/ui/panel.js` | `spShowEditModal` ~L353 — theme via inline `--sp-*` on the overlay (S6). Overlay MUST size via `height:100vh` not `inset:0` (ST's `transform`+`perspective` on `<html>` makes it the containing block → `inset:0` collapses the overlay to ~0 height and centres the box off-screen). `.sp-em-fields` needs `min-height:0` for internal scroll. |
+| Settings window tabs | `src/ui/panel.js` | `renderPanelContent` (seeds from `spDraftedConfig()`); 字段 `spRenderFieldsTab` + `spBindFieldsTab` (first-setup fields-save seeds default layout+theme, F2); `spTemplateTokenWarnings`; 样式 `spRenderStylesTab` + `spBindStylesTab` (live theme, `spThemeColorField` **+ `.sp-color-hex` companion B1**, ↺-follow; `collectTheme`→`spCaptureThemeFromDom`); 生成 `spRenderGenerateTab` + `spBindGenerateTab`; 管理 `spRenderManageTab`; `openPanel`. Line #s drift — grep the symbol |
+| Unsaved-draft model (F1/F2) | `src/ui/panel.js` | `spPanelDraft`/`spCurrentTabEdited`/`SP_DRAFT_KEYS` ~L6; `spDraftedConfig`/`spCaptureCurrentTabDraft`/`spBeforeRerender`/`spClearSavedTabDraft`/`spDiscardDraft`/`spUpdateDirtyCue` (top of file). Edits persist across tab-switch + close/reopen; cleared by 清除更改 / per-tab save / reload. Header cue `#sp-unsaved-cue` + `#sp-panel-clear` |
+| Edit modal | `src/ui/panel.js` | `spShowEditModal` ~L353 — box CSS in `styles.js`; theme inherits ST (`--SmartTheme*`) with `--sp-*`/literal fallbacks (**S6 amended 2026-07-09** — was card-panel `--sp-*` only). Overlay MUST size via `height:100vh` not `inset:0` (ST's `transform`+`perspective` on `<html>` makes it the containing block → `inset:0` collapses the overlay to ~0 height and centres the box off-screen). `.sp-em-fields` needs `min-height:0` for internal scroll. |
 | Actions HTML / bridge / fold | `src/core/constants.js` | `SP_DEFAULT_ACTIONS_HTML` (重试+编辑 only), `SP_IFRAME_BRIDGE` (fold toggle + tap-away, `⏳ 生成中`) |
-| Script toolbar buttons | `src/ui/toolbar.js` | `spBindScriptToolbarButtons`; buttons = SP 面板 / SP 清除 (SP 刷新 removed). Floating FAB removed 2026-07-07 — settings open only via SP 面板 |
+| Script toolbar buttons | `src/ui/toolbar.js` | `spBindScriptToolbarButtons`; buttons = SP 面板 only (SP 清除 binding removed 2026-07-09 — clear modal via 管理 tab 清除聊天数据; SP 刷新 removed earlier). Floating FAB removed 2026-07-07 |
 | Event wiring | `src/index.js` | `initStatusPanel` (CHARACTER_MESSAGE_RENDERED, MESSAGE_UPDATED/RECEIVED/SWIPED, CHAT_CHANGED, MESSAGE_DELETED) |
 
 ## Architecture (modules)
@@ -61,8 +62,8 @@ Global TavernHelper **engine** for per-character status panels. Panel definition
   - Read first: `spAdoptFieldsFromParsedBlock` (render.js ~L878), `spSyncMarkersOnlyForMessage` (~L1009)
   - Chat open parses blocks (no API spend); JSON block + zero fields → fields auto-created with 示例值 (+ default layout if template empty). `键: 值` lines never adopt. (The manual 注入当前消息 button was removed — S8 amend 2026-07-06; block-absent messages get a panel via 重试.)
 - **Generation (retry) fails / badge 生成失败**
-  - Read first: `runStatusGeneration` (generate.js L90) + `buildStatusGenerationPrompts` (L55)
-  - The ONLY generateRaw path, reachable only from 重试 (S1). Zero fields → error, no request (S5). Error stored per message; 重试 stays live. Harness: needs `st-mock-api` up; queue responses via `POST localhost:3101/admin/queue/push`.
+  - Read first: `runStatusGeneration` (generate.js L221) + `buildStatusGenerationPrompts` (L55)
+  - The value-generation generateRaw path, reachable only from 重试 (S1). Zero fields → error, no request (S5). Error stored per message; 重试 stays live. Harness: needs `st-mock-api` up; queue responses via `POST localhost:3101/admin/queue/push`.
 - **Instruction not in prompt (Path A)**
   - Read first: `spSyncExtensionPrompt` (render.js L784), `spBuildFullPromptContent` (parser.js L180)
   - Injection is always on while enabled + fields exist (no toggle). Role/depth from engine (`defaultPromptRole`/`defaultPromptInChatDepth`, default depth 0). Verify via `ctx.extensionPrompts` (key `status_panel_instructions`) or the outgoing request body. The 生成-tab 注入内容预览 shows the exact text (S2).
@@ -71,21 +72,21 @@ Global TavernHelper **engine** for per-character status panels. Panel definition
   - Identity is avatar **filename**; export/import round-trip test procedure in changelog.
 - **Settings tab bugs**
   - Read first: the specific `spRender*Tab` + its `spBind*Tab` (panel.js, adjacent)
-  - Save split rule (S2/S3): engine keys (role/depth/API/renderMode) → `spEngineSave`; card keys (fields/template/theme/tag/preamble/retryIncludePrev) → `spCharDefSave`. `spCharDefSave` filters to `SP_CARD_ALLOWED_KEYS` (S11) — API keys can't reach the card even if mis-routed.
+  - Save split rule (S2/S3): engine keys (role/depth/API/renderMode) → `spEngineSave`; card keys (fields/template/theme/preamble/retryIncludePrev) → `spCharDefSave`. `spCharDefSave` filters to `SP_CARD_ALLOWED_KEYS` (S11) — API keys can't reach the card even if mis-routed. (Note: `tagStart`/`tagEnd` removed in S13.)
 - **Template/token issues**
   - Read first: `spInterpolateTemplate` + `spBuildIframeSrcdoc` (render.js), `spTemplateTokenWarnings` (panel.js)
-  - `{name}` empty → dash (never the field example, S5); layoutgen relies on the plain-text dash for `--spg-v:{token}`. `{{name}}` removed — flagged as unknown.
+  - `{name}` empty → dash (never the field example, S5); layoutgen relies on the plain-text dash for `--spg-v:{token}`. `{{name}}` = field-name label token (S14; two-pass in `spInterpolateTemplate` — labels first, then values).
 - **Styling / theme / global CSS / web fonts (S6/S7)**
   - Read first: `SP_IFRAME_GLOBAL_CSS` (styles.js L468), `spBuildThemeVarBlock` (render.js L518), `spBindStylesTab` (panel.js L928 — `collectTheme`/`regenSimple`/`spThemeColorField`), `spLayoutTheme` (layoutgen.js)
   - Chrome CSS is global + `--sp-*` var-driven; the 简易 generator emits markup + bar calc only. Colours knobs store `''` = follow accent/default (`data-sp-overridden`); ↺ link clears the override. Preview reads the LIVE theme (`collectTheme()` passed into `spBuildIframeSrcdoc`), not the saved cfg.
   - Web fonts: `@import` must sit in its own `<style>` before reset+global (spBuildIframeSrcdoc splits it); a mid-sheet @import is silently ignored — verify via fonts.gstatic requests, not console.
-- **Usually ignore**: `src/core/constants.js` (stable ids — but `SP_DEFAULT_ACTIONS_HTML`/`SP_IFRAME_BRIDGE` changed in v3), `src/ui/styles.js` panel-chrome CSS (dead `.sp-preset-*`/`.sp-prev-*` rules linger, harmless), `build.js` (only when adding a file or changing dist metadata/buttons).
+- **Usually ignore**: `src/core/constants.js` (stable ids — but `SP_DEFAULT_ACTIONS_HTML`/`SP_IFRAME_BRIDGE` changed in v3), `src/ui/styles.js` panel-chrome CSS (dead `.sp-preset-*`/`.sp-prev-*` rules removed 2026-07-09; settings-window `#SP_PANEL_ID` + `.sp-edit-modal` chrome now inherit ST theme via `--SmartTheme*`/`--black30a` with dark-literal fallbacks — 2026-07-09), `build.js` (only when adding a file or changing dist metadata/buttons).
 
 ## Working Rules
 
-- **Read `SPEC.md` before touching prompt assembly, the card schema, or the styling model.** Changes must cite a SPEC ID (S1–S11); do not "improve" past a locked decision.
+- **Read `SPEC.md` before touching prompt assembly, the card schema, or the styling model.** Changes must cite a SPEC ID (S1–S14); do not "improve" past a locked decision.
 - All user-facing strings Chinese; identifiers/comments/docs English.
-- **No auto/fallback generation (S1).** The only `generateRaw` call site is `runStatusGeneration`, reachable only from 重试. Do not add an on-missing/auto path.
+- **No auto/fallback VALUE generation (S1).** `runStatusGeneration` (value generateRaw) is reachable only from 重试 — do not add an on-missing/auto value path. It is now the **only** `generateRaw` site (the S12/S13 in-app AI Theme Generator was removed 2026-07-08 — panel styling is via 简易/高级 + the external-model prompt in `AUTHOR.md`). Do not reintroduce an in-app design-generation path.
 - Layer-3 writes only via `spMergeChatMessageData` (`refresh:'none'`). No echo guards exist anymore — do not reintroduce them; fix root causes.
 - `SillyTavern.getContext()` fresh at every read; a held ctx goes stale across chat switches.
 - **Never call this script's own `requestAnimationFrame`** — the engine runs in TH's
@@ -98,4 +99,4 @@ Global TavernHelper **engine** for per-character status panels. Panel definition
 - Testing: Docker harness + chrome-devtools MCP; engine handle lives in the TH iframe's `contentWindow`, panel iframes are read via `srcdoc`. After a save-triggered refresh, wait ~1.5 s and re-probe before declaring a render failure (old iframe may still be attached).
 - Snapshot/restore in probes: stashing state on `window.__x` across `evaluate_script` calls proved unreliable once (2026-07-05 S3 — a def "restore" round-tripped the contaminated post-save state). Prefer resetting through the app's own UI/save pipeline and verify with a fresh server fetch (`POST /api/characters/get`), not just `ctx.characters`.
 - Stale-deploy trap: if the bundle can't be copied/served due to a file lock, STOP and report — never test stale code.
-- Author-facing docs: `AUTHOR.md`. Session tracking: `plan.md` + `changelog.md` (`### YYYY-MM-DD / Session N`).
+- Author-facing docs: `AUTHOR.md` + `指南.md` are concise mirror tutorials (EN/中文, <400 words each — buttons, tabs, two-mode injection); **`styles.md`** (EN) + **`样式.md`** (中文 mirror) are the panel's full HTML/CSS reference (every `SP_IFRAME_GLOBAL_CSS` selector, `--sp-*` vars + defaults, tokens, scoping) — update **both** when the iframe styling contract changes. `styles-prompt.md` = the external-model CSS prompt (leave unless the styling contract shifts). Session tracking: `plan.md` + `changelog.md` (`### YYYY-MM-DD / Session N`).

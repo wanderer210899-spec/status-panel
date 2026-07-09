@@ -12,9 +12,9 @@ let _spGenChain = Promise.resolve();
 function spResetGenChain() { _spGenChain = Promise.resolve(); }
 
 /** Remove the status-block span (markers + inner) from a message so the model sees clean prose. */
-function spStripStatusBlockFromText(text, cfg) {
+function spStripStatusBlockFromText(text) {
   const s = String(text || '');
-  const { start, end } = spTagPair(cfg);
+  const { start, end } = spTagPair();
   const a = s.indexOf(start);
   const b = s.lastIndexOf(end);
   if (a === -1 || b === -1 || b <= a) return s.trim();
@@ -64,7 +64,7 @@ function buildStatusGenerationPrompts(cfg, messageId) {
   if (prev) ordered.push(prev);
 
   const row = spGetMessageRow(messageId);
-  const cleaned = row ? spStripStatusBlockFromText(row.message || '', cfg) : '';
+  const cleaned = row ? spStripStatusBlockFromText(row.message || '') : '';
   if (cleaned) ordered.push({ role: 'assistant', content: cleaned });
 
   const schemaJson = JSON.stringify(statusFieldsToJsonSchema(cfg.fields));

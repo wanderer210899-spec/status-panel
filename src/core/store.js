@@ -50,8 +50,6 @@ const SP_CARD_ALLOWED_KEYS = [
   'htmlTemplate',
   'css',
   'defaultPromptContent',
-  'tagStart',
-  'tagEnd',
   'designMode',
   'theme',
   'exampleUseDefaults', // deprecated & ignored (output block now always uses placeholders); kept whitelisted so legacy cards don't trip strip-warnings
@@ -65,10 +63,6 @@ const SP_CHARDEF_TEMPLATE = {
   htmlTemplate: '',
   css: '',
   defaultPromptContent: SP_DEFAULT_PREAMBLE_ZH,
-  /** Status-block tag override; empty = default HTML-comment markers.
-   *  Lets authors port panels whose prompts already emit e.g. <StatusBlock>…</StatusBlock>. */
-  tagStart: '',
-  tagEnd: '',
   /** 样式 tab mode: 'simple' drives the layoutgen generator, 'advanced' is raw HTML+CSS paste. */
   designMode: 'simple',
   /** 简易 mode theme knobs consumed by spGenerateLayoutHtml. */
@@ -93,8 +87,6 @@ const SP_CONFIG_BASE = {
   htmlTemplate: '',
   css: '',
   defaultPromptContent: SP_DEFAULT_PREAMBLE_ZH,
-  tagStart: '',
-  tagEnd: '',
   designMode: 'simple',
   theme: { accent: '#7c9cff', radius: 12, textSize: 13 },
   retryIncludePrev: true,

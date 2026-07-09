@@ -160,8 +160,6 @@
     'htmlTemplate',
     'css',
     'defaultPromptContent',
-    'tagStart',
-    'tagEnd',
     'designMode',
     'theme',
     'exampleUseDefaults', // deprecated & ignored (output block now always uses placeholders); kept whitelisted so legacy cards don't trip strip-warnings
@@ -175,10 +173,6 @@
     htmlTemplate: '',
     css: '',
     defaultPromptContent: SP_DEFAULT_PREAMBLE_ZH,
-    /** Status-block tag override; empty = default HTML-comment markers.
-     *  Lets authors port panels whose prompts already emit e.g. <StatusBlock>…</StatusBlock>. */
-    tagStart: '',
-    tagEnd: '',
     /** 样式 tab mode: 'simple' drives the layoutgen generator, 'advanced' is raw HTML+CSS paste. */
     designMode: 'simple',
     /** 简易 mode theme knobs consumed by spGenerateLayoutHtml. */
@@ -203,8 +197,6 @@
     htmlTemplate: '',
     css: '',
     defaultPromptContent: SP_DEFAULT_PREAMBLE_ZH,
-    tagStart: '',
-    tagEnd: '',
     designMode: 'simple',
     theme: { accent: '#7c9cff', radius: 12, textSize: 13 },
     retryIncludePrev: true,
@@ -507,14 +499,11 @@
   // ─── Main-message status-block extraction (no regex for the tag scan) ───────
   
   /**
-   * Effective tag delimiters for the AI's status block.
-   * Definitions may override (`tagStart`/`tagEnd`) so authors can port panels whose
-   * prompts already emit e.g. `<StatusBlock>…</StatusBlock>`; empty = default markers.
+   * Tag delimiters for the AI's status block — ALWAYS the default invisible markers (S13).
+   * The former per-card `tagStart`/`tagEnd` override was removed; this takes no config.
    */
-  function spTagPair(cfg) {
-    const start = cfg && typeof cfg.tagStart === 'string' && cfg.tagStart.trim() ? cfg.tagStart.trim() : MARKER_START;
-    const end = cfg && typeof cfg.tagEnd === 'string' && cfg.tagEnd.trim() ? cfg.tagEnd.trim() : MARKER_END;
-    return { start, end };
+  function spTagPair() {
+    return { start: MARKER_START, end: MARKER_END };
   }
   
   function spTryExtractMarkers(text, startTag, endTag) {
@@ -592,7 +581,7 @@
    */
   function extractStatusFromMessage(text, cfg) {
     const conf = cfg || effectiveConfig();
-    const { start, end } = spTagPair(conf);
+    const { start, end } = spTagPair();
     const res = spTryExtractMarkers(text, start, end);
     if (res.ok) return res;
     if (res.error === 'json_parse') {
@@ -637,8 +626,8 @@
     return '{' + parts.join(',') + '}';
   }
   
-  function spMarkerBlockForFields(fields, cfg) {
-    const { start, end } = spTagPair(cfg);
+  function spMarkerBlockForFields(fields) {
+    const { start, end } = spTagPair();
     return start + spMarkerJsonPlaceholderForFields(fields) + end;
   }
   
@@ -696,7 +685,7 @@
       parts.push(
         '在正文全部结束后，另起一行追加且仅追加一个状态数据块（下列标记 + 一个 JSON 对象，禁止使用 markdown 代码块）。' +
           '把每个 <…> 占位符替换为当前时刻的真实值（键名保持不变，数值不加引号）：\n' +
-          spMarkerBlockForFields(cfg.fields, cfg),
+          spMarkerBlockForFields(cfg.fields),
       );
     }
     return parts.join('\n\n');
@@ -1177,31 +1166,32 @@
         '.sp-json-tok-unknown{color:#c0392b;text-decoration:underline wavy #c0392b;}\n' +
         '.sp-json-tok-caret{color:#c0392b;font-weight:bold;}\n' +
         // Edit modal — host doc, not iframe; same z-index family as the clear modal.
-        // Theme via --sp-* vars set inline on the overlay (spShowEditModal) so the editor
-        // matches the active card's panel; opaque surface kept (it floats over the chat).
+        // Theme: inherits the active SillyTavern theme (--SmartTheme* vars), falling back to the
+        // card's panel --sp-* vars, then to a literal dark surface. (S6 amended 2026-07-09 — the
+        // editor used to match the card panel; user chose ST-theme consistency with the settings window.)
         // NOTE: height is 100vh, NOT inset:0/bottom:0. ST puts a transform+perspective on <html>,
         // which makes <html> the containing block for our position:fixed overlay; that box is
         // height-collapsed, so inset:0 gave the overlay ~0 height and the modal centred off-screen.
         // vh is viewport-relative regardless of containing block. Do not revert to inset:0.
         '.sp-edit-modal{position:fixed;top:0;left:0;right:0;height:100vh;background:rgba(0,0,0,.65);z-index:100001;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box;}\n' +
-        '.sp-edit-modal .sp-edit-box{background:#1b1d27;border:1px solid var(--sp-border-color,rgba(255,255,255,.15));border-radius:var(--sp-radius,14px);padding:20px 22px;' +
-          'max-width:520px;width:92%;max-height:88vh;display:flex;flex-direction:column;color:var(--sp-text-color,rgba(255,255,255,.92));' +
-          'font:13px/1.45 var(--sp-font,system-ui,Segoe UI,Roboto,sans-serif);box-shadow:0 8px 32px rgba(0,0,0,.5);}\n' +
-        '.sp-edit-modal .sp-em-title{margin:0 0 4px;font-size:15px;font-weight:650;color:var(--sp-title-color,var(--sp-accent,inherit));}\n' +
+        '.sp-edit-modal .sp-edit-box{background:var(--SmartThemeBlurTintColor,#1b1d27);border:1px solid var(--SmartThemeBorderColor,var(--sp-border-color,rgba(255,255,255,.15)));border-radius:var(--sp-radius,14px);padding:20px 22px;' +
+          'max-width:520px;width:92%;max-height:88vh;display:flex;flex-direction:column;color:var(--SmartThemeBodyColor,var(--sp-text-color,rgba(255,255,255,.92)));' +
+          'font:13px/1.45 var(--sp-font,system-ui,Segoe UI,Roboto,sans-serif);box-shadow:0 8px 32px var(--SmartThemeShadowColor,rgba(0,0,0,.5));}\n' +
+        '.sp-edit-modal .sp-em-title{margin:0 0 4px;font-size:15px;font-weight:650;color:var(--SmartThemeQuoteColor,var(--sp-title-color,var(--sp-accent,inherit)));}\n' +
         '.sp-edit-modal .sp-em-sub{margin:0 0 14px;font-size:11px;opacity:.7;}\n' +
         '.sp-edit-modal .sp-em-fields{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-right:4px;}\n' +
         '.sp-edit-modal .sp-em-row{display:flex;flex-direction:column;gap:4px;}\n' +
         '.sp-edit-modal .sp-em-label{font:600 11px/1.1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em;opacity:.75;}\n' +
-        '.sp-edit-modal .sp-em-input{box-sizing:border-box;width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--sp-border-color,rgba(255,255,255,.18));' +
-          'background:rgba(0,0,0,.32);color:var(--sp-text-color,rgba(255,255,255,.95));font:12px/1.4 ui-monospace,monospace;}\n' +
+        '.sp-edit-modal .sp-em-input{box-sizing:border-box;width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--SmartThemeBorderColor,var(--sp-border-color,rgba(255,255,255,.18)));' +
+          'background:var(--black30a,rgba(0,0,0,.32));color:var(--SmartThemeBodyColor,var(--sp-text-color,rgba(255,255,255,.95)));font:12px/1.4 ui-monospace,monospace;}\n' +
         '.sp-edit-modal .sp-em-textarea{min-height:54px;resize:vertical;}\n' +
-        '.sp-edit-modal .sp-em-input:focus{outline:1px solid var(--sp-accent,rgba(160,140,255,.6));}\n' +
+        '.sp-edit-modal .sp-em-input:focus{outline:1px solid var(--SmartThemeQuoteColor,var(--sp-accent,rgba(160,140,255,.6)));}\n' +
         '.sp-edit-modal .sp-em-hint{font-size:10px;opacity:.55;}\n' +
-        '.sp-edit-modal .sp-em-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);}\n' +
+        '.sp-edit-modal .sp-em-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--SmartThemeBorderColor,rgba(255,255,255,.08));}\n' +
         '.sp-edit-modal .sp-em-btn{all:unset;cursor:pointer;box-sizing:border-box;padding:7px 14px;border-radius:9px;font-size:12px;' +
-          'border:1px solid var(--sp-btn-border-color,rgba(255,255,255,.18));background:var(--sp-btn-color,rgba(0,0,0,.3));color:var(--sp-btn-text-color,inherit);}\n' +
+          'border:1px solid var(--SmartThemeBorderColor,var(--sp-btn-border-color,rgba(255,255,255,.18)));background:var(--sp-btn-color,rgba(0,0,0,.3));color:var(--sp-btn-text-color,inherit);}\n' +
         '.sp-edit-modal .sp-em-btn:hover{filter:brightness(1.15);}\n' +
-        '.sp-edit-modal .sp-em-btn-save{border-color:var(--sp-accent,rgba(160,140,255,.45));background:color-mix(in srgb, var(--sp-accent,#6e5ac8) 32%, transparent);font-weight:600;}\n' +
+        '.sp-edit-modal .sp-em-btn-save{border-color:var(--SmartThemeQuoteColor,var(--sp-accent,rgba(160,140,255,.45)));background:color-mix(in srgb, var(--SmartThemeQuoteColor,var(--sp-accent,#6e5ac8)) 32%, transparent);font-weight:600;}\n' +
         '.sp-edit-modal .sp-em-btn-reset{opacity:.7;font-size:11px;}\n';
       doc.head.appendChild(st);
     }
@@ -1217,12 +1207,21 @@
           display: none;
           flex-direction: column;
           border-radius: 12px;
-          border: 1px solid rgba(255,255,255,0.14);
-          background: rgba(22,22,28,0.96);
-          box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.14));
+          /* B3: guarantee a near-opaque surface (≥0.8) even when the theme's tint var is
+             translucent, by compositing the tint over itself several times. When the ST var
+             is absent the gradient layers resolve to transparent, so the shipped fallback is
+             exactly the original single opaque-ish surface — look unchanged. */
+          background-color: var(--SmartThemeBlurTintColor, rgba(22,22,28,0.96));
+          background-image:
+            linear-gradient(var(--SmartThemeBlurTintColor, transparent), var(--SmartThemeBlurTintColor, transparent)),
+            linear-gradient(var(--SmartThemeBlurTintColor, transparent), var(--SmartThemeBlurTintColor, transparent)),
+            linear-gradient(var(--SmartThemeBlurTintColor, transparent), var(--SmartThemeBlurTintColor, transparent)),
+            linear-gradient(var(--SmartThemeBlurTintColor, transparent), var(--SmartThemeBlurTintColor, transparent));
+          box-shadow: 0 12px 40px var(--SmartThemeShadowColor, rgba(0,0,0,0.45));
           overflow: hidden;
-          font: 13px/1.35 system-ui, Segoe UI, Roboto, sans-serif;
-          color: rgba(255,255,255,0.92);
+          font: 13px/1.35 var(--mainFontFamily, system-ui, Segoe UI, Roboto, sans-serif);
+          color: var(--SmartThemeBodyColor, rgba(255,255,255,0.92));
         }
         #${SP_PANEL_ID}.sp-panel-open { display: flex; }
         #${SP_PANEL_ID} .sp-panel-header {
@@ -1233,8 +1232,8 @@
           cursor: move;
           user-select: none;
           touch-action: none;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
-          background: rgba(0,0,0,0.25);
+          border-bottom: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
+          background: var(--black30a, rgba(0,0,0,0.25));
         }
         #${SP_PANEL_ID} .sp-panel-title { font-weight: 600; flex: 1; }
         #${SP_PANEL_ID} .sp-panel-close {
@@ -1245,11 +1244,21 @@
           opacity: 0.85;
         }
         #${SP_PANEL_ID} .sp-panel-close:hover { background: rgba(255,255,255,0.08); }
+        /* F2: unsaved-changes cue + F1: 清除更改 button, top-right of the header. */
+        #${SP_PANEL_ID} .sp-unsaved-cue {
+          font-size: 11px; font-weight: 600; color: #f0c674; opacity: 0.95; white-space: nowrap;
+        }
+        #${SP_PANEL_ID} .sp-panel-clear {
+          all: unset; cursor: pointer; padding: 4px 10px; border-radius: 8px; font-size: 11px; opacity: 0.85;
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.18));
+          background: var(--black30a, rgba(0,0,0,0.25));
+        }
+        #${SP_PANEL_ID} .sp-panel-clear:hover { opacity: 1; background: rgba(255,255,255,0.08); }
         #${SP_PANEL_ID} .sp-tabs {
           display: flex;
           gap: 4px;
           padding: 8px 8px 0;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
+          border-bottom: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
           flex-wrap: wrap;
         }
         #${SP_PANEL_ID} .sp-tab {
@@ -1283,115 +1292,33 @@
           box-sizing: border-box;
           padding: 8px;
           border-radius: 8px;
-          border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(0,0,0,0.35);
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.12));
+          background: var(--black30a, rgba(0,0,0,0.35));
           color: inherit;
           font: 12px/1.35 ui-monospace, monospace;
         }
         #${SP_PANEL_ID} textarea { min-height: 72px; resize: vertical; }
-        #${SP_PANEL_ID} div.sp-prompt-preview {
-          width: 100%;
-          box-sizing: border-box;
-          padding: 8px;
-          border-radius: 8px;
-          border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(0,0,0,0.35);
-          color: inherit;
-          min-height: 160px;
-          max-height: min(42vh, 420px);
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          overscroll-behavior: contain;
-          touch-action: pan-y;
-          font: 11px/1.45 ui-monospace, monospace;
-        }
-        #${SP_PANEL_ID} .sp-prev-meta {
-          font-size: 10px; opacity: .62; margin-bottom: 8px; line-height: 1.4;
-        }
-        #${SP_PANEL_ID} .sp-prev-sec-head {
-          font: 700 9px/1 ui-monospace,monospace; text-transform: uppercase;
-          letter-spacing: .06em; opacity: .4; margin: 8px 0 4px;
-        }
-        #${SP_PANEL_ID} .sp-prev-block {
-          margin-bottom: 4px; border-radius: 5px; border-left: 3px solid;
-          padding: 5px 8px; word-break: break-word;
-        }
-        #${SP_PANEL_ID} .sp-prev-builtin { border-color: rgba(160,160,160,.4); background: rgba(255,255,255,.03); }
-        #${SP_PANEL_ID} .sp-prev-preset { border-color: rgba(80,140,220,.55); background: rgba(80,140,220,.07); }
-        #${SP_PANEL_ID} .sp-prev-sp { border-color: rgba(80,200,120,.55); background: rgba(80,200,120,.07); }
-        #${SP_PANEL_ID} .sp-prev-schema { border-color: rgba(220,160,50,.55); background: rgba(220,160,50,.07); }
-        #${SP_PANEL_ID} .sp-prev-inject { border-color: rgba(160,100,220,.55); background: rgba(160,100,220,.07); }
-        #${SP_PANEL_ID} .sp-prev-hdr {
-          display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-          margin-bottom: 3px; font-size: 10px;
-        }
-        #${SP_PANEL_ID} .sp-prev-idx { opacity: .4; font-size: 9px; }
-        #${SP_PANEL_ID} .sp-prev-badge {
-          display: inline-block; padding: 1px 5px; border-radius: 3px;
-          font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-        }
-        #${SP_PANEL_ID} .sp-badge-builtin { background: rgba(160,160,160,.2); color: rgba(200,200,200,.8); }
-        #${SP_PANEL_ID} .sp-badge-preset { background: rgba(80,140,220,.25); color: rgba(140,190,255,.9); }
-        #${SP_PANEL_ID} .sp-badge-sp { background: rgba(80,200,120,.25); color: rgba(130,230,160,.9); }
-        #${SP_PANEL_ID} .sp-badge-schema { background: rgba(220,160,50,.25); color: rgba(255,200,100,.9); }
-        #${SP_PANEL_ID} .sp-badge-inject { background: rgba(160,100,220,.25); color: rgba(200,160,255,.9); }
-        #${SP_PANEL_ID} .sp-prev-name { font-weight: 600; opacity: .9; }
-        #${SP_PANEL_ID} .sp-prev-source { opacity: .52; font-style: italic; }
-        #${SP_PANEL_ID} .sp-prev-depth { opacity: .5; font-size: 9px; }
-        #${SP_PANEL_ID} .sp-prev-placeholder {
-          font-style: italic; opacity: .52; font-size: 10px; line-height: 1.35;
-        }
-        #${SP_PANEL_ID} .sp-prev-content {
-          white-space: pre-wrap; font-size: 10px; opacity: .82;
-          max-height: 100px; overflow: hidden; line-height: 1.4;
-        }
-        #${SP_PANEL_ID} .sp-prev-schema-dt summary {
-          cursor: pointer; opacity: .68; font-size: 10px; margin-bottom: 2px;
-        }
-        #${SP_PANEL_ID} .sp-prev-schema-dt[open] .sp-prev-content { max-height: 220px; }
         #${SP_PANEL_ID} #sp-def-prompt { min-height: 140px; }
-        #${SP_PANEL_ID} .sp-preset-scroll {
-          min-height: 72px;
-          height: 160px;
-          max-height: 160px;
-          overflow: auto;
-          border: 1px solid rgba(255,255,255,.08);
-          padding: 6px;
-          border-radius: 8px;
-          box-sizing: border-box;
-        }
-        #${SP_PANEL_ID} .sp-preset-row {
-          display: flex; align-items: center; gap: 5px;
-          margin: 1px 0; padding: 3px 4px; border-radius: 4px; font-size: 11px;
-        }
-        #${SP_PANEL_ID} .sp-preset-row-builtin { opacity: .72; cursor: pointer; }
-        #${SP_PANEL_ID} .sp-preset-row-builtin:hover { background: rgba(255,255,255,.05); }
-        #${SP_PANEL_ID} .sp-preset-row-excluded { opacity: .38 !important; text-decoration: line-through; }
-        #${SP_PANEL_ID} .sp-preset-row-excluded .sp-preset-row-tag::after { content: ' ✕'; }
-        #${SP_PANEL_ID} .sp-preset-row-empty { opacity: .42; }
-        #${SP_PANEL_ID} .sp-preset-row-custom { cursor: pointer; }
-        #${SP_PANEL_ID} .sp-preset-row-custom:hover { background: rgba(255,255,255,.05); }
-        #${SP_PANEL_ID} .sp-prev-excluded-note { opacity: .7; font-size: 11px; }
-        #${SP_PANEL_ID} .sp-preset-row input[type="checkbox"] { flex-shrink: 0; width: auto; margin: 0; }
-        #${SP_PANEL_ID} .sp-preset-row-icon { opacity: .5; font-size: 10px; flex-shrink: 0; }
-        #${SP_PANEL_ID} .sp-preset-row-name {
-          flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-        #${SP_PANEL_ID} .sp-preset-row-tag {
-          flex-shrink: 0; font-size: 9px; font-weight: 700; padding: 1px 4px;
-          border-radius: 3px; text-transform: uppercase; letter-spacing: .04em;
-        }
-        #${SP_PANEL_ID} .sp-preset-tag-builtin { background: rgba(160,160,160,.2); color: rgba(190,190,190,.7); }
-        #${SP_PANEL_ID} .sp-preset-tag-empty { background: rgba(100,100,100,.2); color: rgba(140,140,140,.6); }
-        #${SP_PANEL_ID} .sp-preset-tag-role { background: rgba(80,140,220,.2); color: rgba(140,190,255,.75); }
   #${SP_PANEL_ID} .sp-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+        /* B2/B4: keep an inline field group (label text + its control, or a check/radio +
+           its caption) on one aligned baseline. Selects/number inputs in a row must size to
+           content, not stretch to the global 100% width that would break the row. */
+        #${SP_PANEL_ID} .sp-row label { display: inline-flex; align-items: center; gap: 6px; }
+        #${SP_PANEL_ID} .sp-row label > select,
+        #${SP_PANEL_ID} .sp-row label > input[type="number"] { width: auto; }
+        /* B4: ST's global input styling otherwise leaks onto our check/radio boxes and
+           pushes them off their labels — reset size/margin so they sit beside the caption. */
+        #${SP_PANEL_ID} input[type="checkbox"], #${SP_PANEL_ID} input[type="radio"] {
+          width: auto; margin: 0; flex: 0 0 auto; vertical-align: middle;
+          accent-color: var(--SmartThemeQuoteColor, #7c9cff);
+        }
         #${SP_PANEL_ID} .sp-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
         #${SP_PANEL_ID} button.sp-btn {
           all: unset;
           cursor: pointer;
           padding: 6px 12px;
           border-radius: 8px;
-          border: 1px solid rgba(255,255,255,0.14);
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.14));
           background: rgba(255,255,255,0.06);
           font-size: 12px;
         }
@@ -1400,11 +1327,11 @@
         #${SP_PANEL_ID} .sp-import-row { display: flex; gap: 6px; margin-bottom: 4px; }
         #${SP_PANEL_ID} .sp-field-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
         #${SP_PANEL_ID} .sp-field-card {
-          border: 1px solid rgba(255,255,255,0.1);
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.1));
           border-radius: 10px;
           padding: 10px;
           min-width: 0;
-          background: rgba(0,0,0,0.18);
+          background: var(--black30a, rgba(0,0,0,0.18));
         }
         #${SP_PANEL_ID} .sp-field-card-head {
           display: grid;
@@ -1426,7 +1353,7 @@
           #${SP_PANEL_ID} .sp-field-row-split { grid-template-columns: 1fr; }
         }
         #${SP_PANEL_ID} .sp-field-cell { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-        #${SP_PANEL_ID} .sp-field-range { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); }
+        #${SP_PANEL_ID} .sp-field-range { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.06)); }
         #${SP_PANEL_ID} .sp-field-range .sp-label { margin-bottom: 4px; }
         #${SP_PANEL_ID} .sp-field-range-inputs {
           display: grid;
@@ -1436,9 +1363,8 @@
           min-width: 0;
         }
         #${SP_PANEL_ID} .sp-field-range-dash { opacity: 0.5; text-align: center; font-size: 12px; }
-        #${SP_PANEL_ID} .sp-insert-field-brace { min-width: 0; flex: 1; }
         #${SP_PANEL_ID} .sp-preview-wrap {
-          border: 1px solid rgba(255,255,255,0.12);
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.12));
           border-radius: 8px;
           min-height: 80px;
           max-height: min(44vh, 440px);
@@ -1452,8 +1378,8 @@
           opacity: 0.92;
           padding: 8px 10px;
           border-radius: 8px;
-          background: rgba(0,0,0,0.28);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: var(--black30a, rgba(0,0,0,0.28));
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
         }
         #${SP_PANEL_ID} .sp-help-p { margin: 0 0 8px 0; }
         #${SP_PANEL_ID} .sp-help-p:last-child { margin-bottom: 0; }
@@ -1465,10 +1391,6 @@
           white-space: pre-wrap;
           word-break: break-word;
         }
-        #${SP_PANEL_ID} .sp-insert-row { align-items: center; margin-top: 6px; }
-        #${SP_PANEL_ID} .sp-preset-line { display: flex; align-items: flex-start; gap: 6px; margin: 2px 0; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
-        #${SP_PANEL_ID} .sp-preset-line:hover { background: rgba(255,255,255,0.05); }
-        #${SP_PANEL_ID} .sp-preset-line input[type="checkbox"] { flex-shrink: 0; margin-top: 2px; width: auto; }
         #${SP_PANEL_ID} .sp-token-warnings {
           font-size: 11px;
           line-height: 1.5;
@@ -1485,18 +1407,25 @@
           height: 26px;
           padding: 1px;
           border-radius: 6px;
-          border: 1px solid rgba(255,255,255,0.18);
-          background: rgba(0,0,0,0.3);
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.18));
+          background: var(--black30a, rgba(0,0,0,0.3));
           cursor: pointer;
           vertical-align: middle;
         }
-        #${SP_PANEL_ID} .sp-tag-row { align-items: center; }
-        #${SP_PANEL_ID} .sp-tag-row input { min-width: 0; flex: 1; font-family: ui-monospace, monospace; }
+        /* B1: hex companion for every colour well — the native picker degrades to a few
+           swatches on mobile, so authors can type/paste any colour here instead. */
+        #${SP_PANEL_ID} input[type="text"].sp-color-hex {
+          width: 5.5rem;
+          flex: 0 0 auto;
+          padding: 4px 6px;
+          font: 11px/1.3 ui-monospace, monospace;
+          text-transform: lowercase;
+        }
         #${SP_PANEL_ID} details.sp-adv {
-          border: 1px solid rgba(255,255,255,0.1);
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.1));
           border-radius: 8px;
           padding: 8px 10px;
-          background: rgba(0,0,0,0.18);
+          background: var(--black30a, rgba(0,0,0,0.18));
         }
         #${SP_PANEL_ID} details.sp-adv > summary {
           cursor: pointer;
@@ -1514,8 +1443,8 @@
           gap: 8px;
           padding: 5px 8px;
           border-radius: 6px;
-          border: 1px solid rgba(255,255,255,0.08);
-          background: rgba(0,0,0,0.18);
+          border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
+          background: var(--black30a, rgba(0,0,0,0.18));
           margin-bottom: 5px;
           min-width: 0;
         }
@@ -1542,8 +1471,6 @@
           #${SP_PANEL_ID} input[type="text"], #${SP_PANEL_ID} input[type="password"], #${SP_PANEL_ID} input[type="number"],
           #${SP_PANEL_ID} textarea, #${SP_PANEL_ID} select { padding: 10px; font-size: 13px; }
           #${SP_PANEL_ID} label.sp-label { font-size: 12px; }
-          #${SP_PANEL_ID} .sp-preset-row { padding: 5px 6px; font-size: 12px; }
-          #${SP_PANEL_ID} .sp-preset-row-tag { font-size: 10px; }
         }
       `;
       doc.head.appendChild(st2);
@@ -1596,7 +1523,7 @@
   const SP_IFRAME_GLOBAL_CSS =
     // 简易 layout scaffold.
     '.spg-card{font:var(--sp-text-size,13px)/1.6 var(--sp-font,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif);' +
-      'color:var(--sp-text-color,rgba(255,255,255,.92));background:rgba(12,14,20,.42);' +
+      'color:var(--sp-text-color,rgba(255,255,255,.92));background:rgba(12,14,20,.88);' +
       'border:1px solid var(--sp-border-color,#7c9cff);border-radius:var(--sp-radius,12px);padding:12px 14px;}\n' +
     '.spg-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}\n' +
     '.spg-title{font-weight:650;letter-spacing:.4px;color:var(--sp-title-color,var(--sp-accent,#7c9cff));}\n' +
@@ -2277,7 +2204,7 @@
     let row = null;
     try { row = spGetMessageRow(messageId); } catch { /* ignore */ }
   
-    const { start: tagS, end: tagE } = spTagPair(effectiveConfig());
+    const { start: tagS, end: tagE } = spTagPair();
   
     // Compute the exact marker JSON payload from saved chat text (row.message).
     // ST may strip comment delimiters in rendered HTML, leaving only the bare JSON visible;
@@ -2372,15 +2299,25 @@
   }
   
   /**
-   * `{name}` = live stored value. Empty/missing → a muted dash placeholder (S5): the
-   * panel never shows a field's 示例值 as if it were real data. `{{name}}` default
-   * tokens were removed in v3 (S4/S10) — they are no longer substituted.
+   * Two token forms per field (S14):
+   *   `{{name}}` = the field's NAME (a static label) — always shown as-is (escaped).
+   *   `{name}`   = the field's live stored VALUE. Empty/missing → a muted dash placeholder
+   *                (S5): the panel never shows a field's 示例值 as if it were real data.
+   * The label pass runs FIRST and fully consumes every `{{name}}`, so the value pass can never
+   * mistake a `{{name}}` for a `{name}` (which would otherwise leave stray braces around the value).
    */
   function spInterpolateTemplate(template, values, fields, opts) {
     const preEscapedLive = opts && opts.preEscapedLiveValues === true;
     /** Inside `<style>` bodies: never emit HTML placeholder spans (breaks CSS / scoping). */
     const plainTextPlaceholders = opts && opts.plainTextPlaceholders === true;
     let html = template || '';
+    // Label pass (S14): `{{name}}` → the field's name. Before the value pass; escaped for safety.
+    for (const f of fields || []) {
+      const name = String(f.name || '').trim();
+      if (!name) continue;
+      html = html.split('{{' + name + '}}').join(esc(name));
+    }
+    // Value pass: `{name}` → live stored value.
     for (const f of fields || []) {
       const name = String(f.name || '').trim();
       if (!name) continue;
@@ -3086,9 +3023,9 @@
   function spResetGenChain() { _spGenChain = Promise.resolve(); }
   
   /** Remove the status-block span (markers + inner) from a message so the model sees clean prose. */
-  function spStripStatusBlockFromText(text, cfg) {
+  function spStripStatusBlockFromText(text) {
     const s = String(text || '');
-    const { start, end } = spTagPair(cfg);
+    const { start, end } = spTagPair();
     const a = s.indexOf(start);
     const b = s.lastIndexOf(end);
     if (a === -1 || b === -1 || b <= a) return s.trim();
@@ -3138,7 +3075,7 @@
     if (prev) ordered.push(prev);
   
     const row = spGetMessageRow(messageId);
-    const cleaned = row ? spStripStatusBlockFromText(row.message || '', cfg) : '';
+    const cleaned = row ? spStripStatusBlockFromText(row.message || '') : '';
     if (cleaned) ordered.push({ role: 'assistant', content: cleaned });
   
     const schemaJson = JSON.stringify(statusFieldsToJsonSchema(cfg.fields));
@@ -3289,6 +3226,119 @@
   let spCurrentTab = 'fields';
   let spPanelDragBound = false;
   
+  // F1: unsaved edits carried across tab switches (and across close/reopen) until the user
+  // saves the owning tab, presses 清除更改, or reloads. Overlays effectiveConfig() at render.
+  // null = no pending edits. F2: spCurrentTabEdited flags the mounted tab as touched since its
+  // last save/clear, so the "未保存" cue can show before the first tab switch captures a draft.
+  let spPanelDraft = null;
+  let spCurrentTabEdited = false;
+  
+  // Which config keys each tab owns — used to clear only that tab's draft after its save.
+  const SP_DRAFT_KEYS = {
+    fields: ['fields'],
+    styles: ['theme', 'designMode', 'renderMode', 'htmlTemplate'],
+    generate: [
+      'defaultPromptInChatDepth', 'defaultPromptRole', 'defaultPromptContent', 'retryIncludePrev',
+      'apiMode', 'apiOpenaiUrl', 'apiOpenaiKey', 'apiOpenaiModel',
+    ],
+  };
+  
+  /** effectiveConfig() with any pending draft edits overlaid (F1). */
+  function spDraftedConfig() {
+    const base = effectiveConfig();
+    if (!spPanelDraft) return base;
+    const out = { ...base, ...spPanelDraft };
+    if (spPanelDraft.theme) out.theme = { ...(base.theme || {}), ...spPanelDraft.theme };
+    return out;
+  }
+  
+  /** Any unsaved edits present (current tab touched, or a stashed draft from another tab)? */
+  function spPanelHasUnsaved() {
+    return spCurrentTabEdited || (!!spPanelDraft && Object.keys(spPanelDraft).length > 0);
+  }
+  
+  /** Show/hide the header "未保存" cue + 清除更改 button to match the dirty state (F2). */
+  function spUpdateDirtyCue() {
+    const doc = chatDoc();
+    const dirty = spPanelHasUnsaved();
+    const cue = doc.getElementById('sp-unsaved-cue');
+    const clr = doc.getElementById('sp-panel-clear');
+    if (cue) cue.style.display = dirty ? '' : 'none';
+    if (clr) clr.style.display = dirty ? '' : 'none';
+  }
+  
+  /** Read the current theme knobs straight from the 样式-tab DOM (shared by capture + preview). */
+  function spCaptureThemeFromDom(doc) {
+    const accentEl = doc.getElementById('sp-theme-accent');
+    if (!accentEl) return null;
+    const val = (id) => { const el = doc.getElementById(id); return el ? el.value : ''; };
+    const overrideColor = (id) => { const el = doc.getElementById(id); return el && el.dataset.spOverridden === '1' ? el.value : ''; };
+    const foldEl = doc.getElementById('sp-theme-fold');
+    const theme = {
+      accent: val('sp-theme-accent') || SP_THEME_DEFAULTS.accent,
+      radius: val('sp-theme-radius') !== '' ? Number(val('sp-theme-radius')) : SP_THEME_DEFAULTS.radius,
+      textSize: val('sp-theme-size') !== '' ? Number(val('sp-theme-size')) : SP_THEME_DEFAULTS.textSize,
+      font: String(val('sp-theme-font') || '').trim(),
+      buttonsCollapsed: !!(foldEl && foldEl.checked),
+    };
+    const COLOR_KEY = {
+      'sp-theme-headc': 'headerColor', 'sp-theme-borderc': 'borderColor', 'sp-theme-textc': 'textColor',
+      'sp-theme-btnc': 'btnColor', 'sp-theme-btnbc': 'btnBorderColor', 'sp-theme-btntc': 'btnTextColor',
+    };
+    Object.keys(COLOR_KEY).forEach((id) => { theme[COLOR_KEY[id]] = overrideColor(id); });
+    return theme;
+  }
+  
+  /** Stash the currently mounted tab's DOM values into the draft (F1). */
+  function spCaptureCurrentTabDraft() {
+    const doc = chatDoc();
+    const draft = spPanelDraft || {};
+    const val = (id) => { const el = doc.getElementById(id); return el ? el.value : undefined; };
+    const radio = (name) => { const el = doc.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : undefined; };
+    if (spCurrentTab === 'fields') {
+      if (doc.getElementById('sp-field-rows')) draft.fields = spCollectFieldsFromTable();
+    } else if (spCurrentTab === 'styles') {
+      if (doc.getElementById('sp-theme-accent') || doc.getElementById('sp-html-template')) {
+        const theme = spCaptureThemeFromDom(doc);
+        if (theme) draft.theme = theme;
+        const dm = radio('sp-design-mode'); if (dm) draft.designMode = dm;
+        const rm = radio('sp-render-mode'); if (rm) draft.renderMode = rm;
+        const tplEl = doc.getElementById('sp-html-template'); if (tplEl) draft.htmlTemplate = tplEl.value;
+      }
+    } else if (spCurrentTab === 'generate') {
+      const depth = val('sp-inject-depth'); if (depth !== undefined) draft.defaultPromptInChatDepth = Math.max(0, Math.min(999, Number(depth) || 0));
+      const role = val('sp-inject-role'); if (role !== undefined) draft.defaultPromptRole = role;
+      const dp = val('sp-def-prompt'); if (dp !== undefined) draft.defaultPromptContent = dp;
+      const rp = radio('sp-retry-prev'); if (rp !== undefined) draft.retryIncludePrev = rp !== '0';
+      const am = radio('sp-api-mode'); if (am) draft.apiMode = am;
+      const url = val('sp-api-url'); if (url !== undefined) draft.apiOpenaiUrl = url;
+      const key = val('sp-api-key'); if (key !== undefined) draft.apiOpenaiKey = key;
+      const sel = val('sp-api-model-select'); const custom = val('sp-api-model-custom');
+      if (sel !== undefined || custom !== undefined) draft.apiOpenaiModel = (custom && custom.trim()) ? custom.trim() : (sel || '');
+    }
+    spPanelDraft = Object.keys(draft).length ? draft : null;
+  }
+  
+  /** Capture the current tab into the draft before its DOM is replaced/hidden (F1). */
+  function spBeforeRerender() {
+    if (spCurrentTabEdited) { spCaptureCurrentTabDraft(); spCurrentTabEdited = false; }
+  }
+  
+  /** A tab just saved — its draft is now persisted, so drop only that tab's keys (F1). */
+  function spClearSavedTabDraft(tab) {
+    if (!spPanelDraft) return;
+    (SP_DRAFT_KEYS[tab] || []).forEach((k) => { delete spPanelDraft[k]; });
+    if (!Object.keys(spPanelDraft).length) spPanelDraft = null;
+  }
+  
+  /** 清除更改: discard all unsaved edits and re-render from the saved config (F1). */
+  function spDiscardDraft() {
+    spPanelDraft = null;
+    spCurrentTabEdited = false;
+    renderPanelContent();
+    spToast('已丢弃未保存的更改', '状态面板');
+  }
+  
   function ensurePanelShell() {
     const doc = chatDoc();
     if (doc.getElementById(SP_PANEL_ID)) return;
@@ -3298,6 +3348,8 @@
     panel.innerHTML = `
       <div class="sp-panel-header" id="sp-panel-header">
         <span class="sp-panel-title">状态面板</span>
+        <span class="sp-unsaved-cue" id="sp-unsaved-cue" style="display:none" title="有未保存的更改 — 记得在对应页点「保存」">● 未保存</span>
+        <button type="button" class="sp-panel-clear" id="sp-panel-clear" style="display:none" title="丢弃所有未保存的更改（不影响已保存到角色卡的内容）">清除更改</button>
         <button type="button" class="sp-panel-close" id="sp-panel-close" title="关闭">✕</button>
       </div>
       <div class="sp-tabs" id="sp-tabs"></div>
@@ -3312,6 +3364,26 @@
     });
   
     doc.getElementById('sp-panel-close').addEventListener('click', () => closePanel());
+  
+    const clearBtn = doc.getElementById('sp-panel-clear');
+    if (clearBtn) clearBtn.addEventListener('click', () => spDiscardDraft());
+  
+    // F2: any real edit inside the body marks the current tab dirty and shows the cue.
+    // Readonly previews (inject/status-block/model-list) and the live style preview iframe
+    // are excluded so programmatic updates don't raise a false "未保存".
+    const body = doc.getElementById('sp-panel-body');
+    if (body) {
+      const onEdit = (e) => {
+        const t = e.target;
+        if (!t || !/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+        if (t.readOnly || t.disabled) return;
+        if (t.closest && t.closest('#sp-style-preview, .sp-preview-wrap, #sp-api-models')) return;
+        spCurrentTabEdited = true;
+        spUpdateDirtyCue();
+      };
+      body.addEventListener('input', onEdit);
+      body.addEventListener('change', onEdit);
+    }
   
     if (!spPanelDragBound) {
       spPanelDragBound = true;
@@ -3403,7 +3475,10 @@
       .join('');
     tabs.querySelectorAll('[data-sp-tab]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        spCurrentTab = btn.getAttribute('data-sp-tab') || 'fields';
+        const next = btn.getAttribute('data-sp-tab') || 'fields';
+        if (next === spCurrentTab) return;
+        spBeforeRerender(); // stash this tab's edits so switching never loses progress (F1)
+        spCurrentTab = next;
         renderPanelContent();
       });
     });
@@ -3413,7 +3488,7 @@
     const doc = chatDoc();
     const body = doc.getElementById('sp-panel-body');
     if (!body) return;
-    const cfg = effectiveConfig();
+    const cfg = spDraftedConfig(); // seed inputs from saved config + any pending draft (F1)
   
     if (spCurrentTab === 'fields') {
       body.innerHTML = spRenderFieldsTab(cfg);
@@ -3429,6 +3504,7 @@
       spBindManageTab();
     }
     renderTabButtons();
+    spUpdateDirtyCue();
   }
   
   /** Options for OpenAI-style model dropdown (populated via TavernHelper.getModelList). */
@@ -3445,41 +3521,6 @@
     }
     if (cur && !seen.has(cur)) {
       parts.push(`<option value="${esc(cur)}" selected>${esc(cur)} （已保存）</option>`);
-    }
-    return parts.join('');
-  }
-  
-  /** Datalist options: only field names are interpolated into templates / JSON schema for the model. */
-  function spFieldMetaText(f) {
-    const isNum = f.type === 'number';
-    const isEnum = f.type === 'enum';
-    const defS = isNum
-      ? String(Number.isFinite(Number(f.value)) ? Number(f.value) : 0)
-      : String(f.value ?? '');
-    let meta = isNum ? 'number' : isEnum ? 'enum' : 'text';
-    if (isEnum) {
-      const opts = typeof spFieldEnumOptions === 'function' ? spFieldEnumOptions(f) : [];
-      if (opts.length) meta += ` · ${opts.length} 个选项`;
-    } else {
-      meta += ` · 示例：${defS || '（空）'}`;
-    }
-    if (isNum) {
-      const lo = Number(f.min);
-      const hi = Number(f.max);
-      if (Number.isFinite(lo) && Number.isFinite(hi)) meta += ` · 范围 ${lo}–${hi}`;
-      else if (Number.isFinite(lo)) meta += ` · 最小 ${lo}`;
-      else if (Number.isFinite(hi)) meta += ` · 最大 ${hi}`;
-    }
-    return meta;
-  }
-  
-  function spLiveTokenDatalistHtml(fields) {
-    const parts = [];
-    for (const f of fields || []) {
-      const n = String(f.name || '').trim();
-      if (!n) continue;
-      const tok = '{' + n + '}';
-      parts.push(`<option value="${esc(tok)}">${esc(tok + ' — 消息值 · ' + spFieldMetaText(f))}</option>`);
     }
     return parts.join('');
   }
@@ -3863,11 +3904,10 @@
     }
   
     // Status block for greeting prefill: current editor rows (incl. unsaved edits),
-    // one key per field, value = the field's 示例值. Uses the configured tag so ports
-    // with a custom tagStart/tagEnd copy the right markers.
+    // one key per field, value = the field's 示例值. Always the default invisible markers (S13).
     const buildStatusBlock = () => {
       const fields = spCollectFieldsFromTable();
-      const tag = spTagPair(effectiveConfig());
+      const tag = spTagPair();
       const obj = {};
       fields.forEach((f) => {
         if (f.type === 'number') {
@@ -3920,7 +3960,20 @@
       save.addEventListener('click', async () => {
         const fields = spCollectFieldsFromTable();
         try {
-          await spCharDefSave({ fields });
+          const cur = effectiveConfig();
+          const patch = { fields };
+          // F2: on first setup (simple mode, no template yet) seed a default layout + default
+          // colours so the panel renders correctly the moment fields are saved — no separate
+          // trip to the 样式 tab needed. Existing templates/themes are left untouched.
+          if (cur.designMode !== 'advanced' && fields.length && !String(cur.htmlTemplate || '').trim()) {
+            const theme = spLayoutTheme(cur); // saved theme over defaults → default colours if unset
+            patch.htmlTemplate = spGenerateLayoutHtml(fields, theme);
+            patch.designMode = 'simple';
+            if (!cur.theme || !Object.keys(cur.theme).length) patch.theme = theme;
+          }
+          await spCharDefSave(patch);
+          spClearSavedTabDraft('fields');
+          spCurrentTabEdited = false;
           spToast('字段已保存到角色卡', '状态面板');
           renderPanelContent();
           refreshAllAssistantPanels();
@@ -4061,6 +4114,8 @@
       `<label>${esc(label)} ` +
       `<input type="color" id="${id}" value="${esc(shown)}"` +
         ` data-sp-overridden="${overridden ? '1' : ''}" data-sp-follows-accent="${followsAccent ? '1' : ''}" data-sp-fallback="${esc(fallback)}"/>` +
+      `<input type="text" class="sp-color-hex" data-sp-forcolor="${id}" value="${esc(shown)}"` +
+        ` spellcheck="false" autocomplete="off" maxlength="7" aria-label="${esc(label)} 十六进制颜色"/>` +
       `<button type="button" data-sp-reset="${id}" title="恢复跟随（主色/默认）"` +
         ` style="all:unset;cursor:pointer;margin-left:2px;font-size:12px;opacity:${overridden ? '.75' : '.3'};">↺</button>` +
       `</label>`
@@ -4068,7 +4123,6 @@
   }
   
   function spRenderStylesTab(cfg) {
-    const liveOpts = spLiveTokenDatalistHtml(cfg.fields || []);
     const t = spLayoutTheme(cfg);
     const accent7 = spHex7(t.accent, SP_THEME_DEFAULTS.accent);
     const isAdvanced = cfg.designMode === 'advanced';
@@ -4091,7 +4145,7 @@
       <div id="sp-design-simple" style="${isAdvanced ? 'display:none' : ''}">
         <label class="sp-label">主题</label>
         <div class="sp-row sp-theme-row">
-          <label>主色 <input type="color" id="sp-theme-accent" value="${esc(accent7)}"/></label>
+          <label>主色 <input type="color" id="sp-theme-accent" value="${esc(accent7)}"/><input type="text" class="sp-color-hex" data-sp-forcolor="sp-theme-accent" value="${esc(accent7)}" spellcheck="false" autocomplete="off" maxlength="7" aria-label="主色 十六进制颜色"/></label>
           <label>圆角 <input type="number" id="sp-theme-radius" min="0" max="32" step="1" value="${esc(String(t.radius))}" style="width:4rem"/></label>
           <label>字号 <input type="number" id="sp-theme-size" min="10" max="20" step="1" value="${esc(String(t.textSize))}" style="width:4rem"/></label>
         </div>
@@ -4134,10 +4188,6 @@
           <button type="button" class="sp-btn sp-btn-sm" id="sp-import-html-btn">导入 .html 文件…</button>
         </div>
         <textarea id="sp-html-template" spellcheck="false">${esc(cfg.htmlTemplate || '')}</textarea>
-        <div class="sp-row sp-insert-row">
-          <input type="text" list="sp-dl-live-tokens" id="sp-insert-live" class="sp-insert-field-brace" placeholder="插入 {name}（实时值）…" />
-          <datalist id="sp-dl-live-tokens">${liveOpts}</datalist>
-        </div>
       </div>
       <div id="sp-token-warnings" class="sp-token-warnings" style="display:none"></div>
       <div>
@@ -4175,41 +4225,16 @@
     const tpl = doc.getElementById('sp-html-template');
   
     // Overridable colour knobs (S7). Un-overridden ones store '' so spBuildThemeVarBlock
-    // derives them from 主色 (or a neutral default for text colours).
+    // derives them from 主色 (or a neutral default for text colours). The id→theme-key map
+    // lives in spCaptureThemeFromDom (the shared capture path).
     const SP_COLOR_KNOBS = ['sp-theme-headc', 'sp-theme-borderc', 'sp-theme-textc', 'sp-theme-btnc', 'sp-theme-btnbc', 'sp-theme-btntc'];
-    const COLOR_KEY = {
-      'sp-theme-headc': 'headerColor',
-      'sp-theme-borderc': 'borderColor',
-      'sp-theme-textc': 'textColor',
-      'sp-theme-btnc': 'btnColor',
-      'sp-theme-btnbc': 'btnBorderColor',
-      'sp-theme-btntc': 'btnTextColor',
-    };
   
     /** Theme knobs as currently shown in the 简易 section — shared by preview, regen and 保存.
      *  Overridable colours store '' (= follow accent/default) until the author edits them.
      *  Falls back to the saved cfg.theme when the 简易 knobs aren't in the DOM (高级 mode). */
     const collectTheme = () => {
-      const accentEl = doc.getElementById('sp-theme-accent');
-      if (!accentEl) return (cfg.theme && typeof cfg.theme === 'object') ? cfg.theme : {};
-      const val = (id) => {
-        const el = doc.getElementById(id);
-        return el ? el.value : '';
-      };
-      const overrideColor = (id) => {
-        const el = doc.getElementById(id);
-        return el && el.dataset.spOverridden === '1' ? el.value : '';
-      };
-      const foldEl = doc.getElementById('sp-theme-fold');
-      const theme = {
-        accent: val('sp-theme-accent') || SP_THEME_DEFAULTS.accent,
-        radius: val('sp-theme-radius') !== '' ? Number(val('sp-theme-radius')) : SP_THEME_DEFAULTS.radius,
-        textSize: val('sp-theme-size') !== '' ? Number(val('sp-theme-size')) : SP_THEME_DEFAULTS.textSize,
-        font: String(val('sp-theme-font') || '').trim(),
-        buttonsCollapsed: !!(foldEl && foldEl.checked),
-      };
-      SP_COLOR_KNOBS.forEach((id) => { theme[COLOR_KEY[id]] = overrideColor(id); });
-      return theme;
+      const t = spCaptureThemeFromDom(doc);
+      return t || ((cfg.theme && typeof cfg.theme === 'object') ? cfg.theme : {});
     };
   
     const updateTokenWarnings = () => {
@@ -4312,6 +4337,7 @@
         const accentEl = doc.getElementById('sp-theme-accent');
         const accent7 = accentEl ? spHex7(accentEl.value, SP_THEME_DEFAULTS.accent) : SP_THEME_DEFAULTS.accent;
         el.value = el.dataset.spFollowsAccent === '1' ? accent7 : spHex7(el.dataset.spFallback, accent7);
+        syncHexFor(el.id);
         regenSimple();
       });
     });
@@ -4322,7 +4348,7 @@
         const a7 = spHex7(accentInput.value, SP_THEME_DEFAULTS.accent);
         SP_COLOR_KNOBS.forEach((id) => {
           const el = doc.getElementById(id);
-          if (el && el.dataset.spOverridden !== '1' && el.dataset.spFollowsAccent === '1') el.value = a7;
+          if (el && el.dataset.spOverridden !== '1' && el.dataset.spFollowsAccent === '1') { el.value = a7; syncHexFor(id); }
         });
       });
     }
@@ -4332,6 +4358,32 @@
         el.addEventListener('input', regenSimple);
         el.addEventListener('change', regenSimple);
       }
+    });
+  
+    // B1 (mobile): pair every colour well with a hex text field so colours can be typed or
+    // pasted where the native picker degrades to a handful of swatches. Editing either side
+    // drives the same override/regen path the picker already uses.
+    const isHex7 = (v) => /^#?[0-9a-fA-F]{6}$/.test(String(v || '').trim());
+    const norm7 = (v) => {
+      let s = String(v || '').trim().toLowerCase();
+      if (s && s[0] !== '#') s = '#' + s;
+      return s;
+    };
+    const syncHexFor = (id) => {
+      const c = doc.getElementById(id);
+      const h = doc.querySelector('.sp-color-hex[data-sp-forcolor="' + id + '"]');
+      if (c && h) h.value = spHex7(c.value, h.value);
+    };
+    doc.querySelectorAll('.sp-color-hex').forEach((hex) => {
+      const id = hex.getAttribute('data-sp-forcolor');
+      const color = doc.getElementById(id);
+      if (!color) return;
+      color.addEventListener('input', () => { hex.value = spHex7(color.value, hex.value); });
+      hex.addEventListener('input', () => {
+        if (!isHex7(hex.value)) return;
+        color.value = norm7(hex.value);
+        color.dispatchEvent(new Event('input')); // reuse picker's override + regen listeners
+      });
     });
   
     const genBtn = doc.getElementById('sp-gen-layout');
@@ -4355,21 +4407,6 @@
       });
     }
   
-    const insertAt = (input) => {
-      if (!input || !tpl) return;
-      input.addEventListener('change', () => {
-        const v = (input.value || '').trim();
-        if (!v) return;
-        const start = tpl.selectionStart ?? tpl.value.length;
-        const end = tpl.selectionEnd ?? tpl.value.length;
-        tpl.value = tpl.value.slice(0, start) + v + tpl.value.slice(end);
-        tpl.dispatchEvent(new Event('input'));
-        input.value = '';
-        tpl.focus();
-      });
-    };
-    insertAt(doc.getElementById('sp-insert-live'));
-  
     const save = doc.getElementById('sp-save-styles');
     if (save) {
       save.addEventListener('click', async () => {
@@ -4392,6 +4429,9 @@
             theme: collectTheme(),
           });
           spEngineSave({ renderMode: renderModeEl ? renderModeEl.value : 'last_only' });
+          spClearSavedTabDraft('styles');
+          spCurrentTabEdited = false;
+          spUpdateDirtyCue();
           spToast('样式已保存到角色卡', '状态面板');
           injectAuthorCss();
           refreshAllAssistantPanels();
@@ -4467,14 +4507,6 @@
         <textarea id="sp-def-prompt" spellcheck="false">${esc(cfg.defaultPromptContent || '')}</textarea>
       </div>
       <div>
-        <label class="sp-label">状态块标记</label>
-        <p class="sp-help-p" style="font-size:11px;opacity:.75;margin:0 0 6px 0;">引擎读取这对标记之间的状态，留空则使用默认的隐形标记。</p>
-        <div class="sp-row sp-tag-row">
-          <input type="text" id="sp-tag-start" value="${esc(cfg.tagStart || '')}" placeholder="${esc(MARKER_START)}" autocomplete="off" spellcheck="false" />
-          <input type="text" id="sp-tag-end" value="${esc(cfg.tagEnd || '')}" placeholder="${esc(MARKER_END)}" autocomplete="off" spellcheck="false" />
-        </div>
-      </div>
-      <div>
         <label class="sp-label">重试上下文</label>
         <div class="sp-row">
           <label><input type="radio" name="sp-retry-prev" value="1" ${cfg.retryIncludePrev !== false ? 'checked' : ''}/> 包含上一条已知状态（数值更连贯）</label>
@@ -4516,17 +4548,13 @@
     `;
   }
   
-  /** Compose the effective config with the 生成 tab's live (unsaved) instruction + tag
-   *  inputs so the preview shows exactly what will be injected. */
+  /** Compose the effective config with the 生成 tab's live (unsaved) instruction text
+   *  so the preview shows exactly what will be injected. */
   function spGenerateDraftConfig(doc) {
     const base = effectiveConfig();
     const defTa = doc.getElementById('sp-def-prompt');
-    const tagStartEl = doc.getElementById('sp-tag-start');
-    const tagEndEl = doc.getElementById('sp-tag-end');
     return deepMerge(base, {
       defaultPromptContent: defTa ? defTa.value : base.defaultPromptContent,
-      tagStart: tagStartEl ? tagStartEl.value.trim() : base.tagStart,
-      tagEnd: tagEndEl ? tagEndEl.value.trim() : base.tagEnd,
     });
   }
   
@@ -4618,10 +4646,6 @@
     const bindPreview = () => { spUpdateInjectPreview(); };
     const ta = doc.getElementById('sp-def-prompt');
     if (ta) ta.addEventListener('input', bindPreview);
-    ['sp-tag-start', 'sp-tag-end'].forEach((id) => {
-      const el = doc.getElementById(id);
-      if (el) el.addEventListener('input', bindPreview);
-    });
     bindPreview();
   
     // ── Save: engine keys (role/depth/API) via spEngineSave; card keys via spCharDefSave ──
@@ -4636,8 +4660,6 @@
         const custom = customEl && String(customEl.value || '').trim();
         const model = custom || (selEl && selEl.value) || '';
         const defTa = doc.getElementById('sp-def-prompt');
-        const tagStartEl = doc.getElementById('sp-tag-start');
-        const tagEndEl = doc.getElementById('sp-tag-end');
         const retryPrevEl = doc.querySelector('input[name="sp-retry-prev"]:checked');
         try {
           // Injection role/depth + API credentials are per-user engine config.
@@ -4649,18 +4671,19 @@
             apiOpenaiKey: doc.getElementById('sp-api-key') ? doc.getElementById('sp-api-key').value : '',
             apiOpenaiModel: model,
           });
-          // Instruction/tag/example/retry-context are authored content that travels with the card.
+          // Instruction/retry-context are authored content that travels with the card.
           if (spCharDefLoad()) {
             await spCharDefSave({
-              tagStart: tagStartEl ? tagStartEl.value.trim() : '',
-              tagEnd: tagEndEl ? tagEndEl.value.trim() : '',
               defaultPromptContent: defTa ? defTa.value : '',
               retryIncludePrev: !retryPrevEl || retryPrevEl.value !== '0',
             });
             spToast('已保存生成设置', '状态面板');
           } else {
-            spToast('已保存引擎设置（当前角色没有面板定义，标记/指令等角色卡字段未写入）', '状态面板');
+            spToast('已保存引擎设置（当前角色没有面板定义，指令等角色卡字段未写入）', '状态面板');
           }
+          spClearSavedTabDraft('generate');
+          spCurrentTabEdited = false;
+          spUpdateDirtyCue();
           spSyncExtensionPrompt(); // role/depth/instruction may have changed — republish
           refreshAllAssistantPanels();
           bindPreview();
@@ -4884,6 +4907,7 @@
   }
   
   function closePanel() {
+    spBeforeRerender(); // keep current-tab edits alive across close/reopen (F1)
     const doc = chatDoc();
     const panel = doc.getElementById(SP_PANEL_ID);
     if (!panel) return;
@@ -4898,10 +4922,8 @@
 
   // ─── TavernHelper script toolbar buttons ─────────────────────────────────────
   
-  const SP_TH_BUTTON_RELOAD = 'SP 重载';
-  const SP_TH_BUTTON_PANEL = 'SP 面板';
-  /** Opens clear-panel modal in the chat. */
-  const SP_TH_BUTTON_CLEAR = 'SP 清除';
+  const SP_TH_BUTTON_RELOAD = 'SP 重载'; // dev-only: button registered by the dev loader JSON, not shipped
+  const SP_TH_BUTTON_PANEL = 'SP 面板'; // the only shipped toolbar button (user decision 2026-07-09)
   
   function spBindScriptToolbarButtons() {
     const TH = getTH();
@@ -4933,10 +4955,6 @@
   
     bindButton(SP_TH_BUTTON_PANEL, () => {
       if (typeof window.__spOpenPanel === 'function') window.__spOpenPanel();
-    });
-  
-    bindButton(SP_TH_BUTTON_CLEAR, () => {
-      if (typeof spShowClearModal === 'function') spShowClearModal();
     });
   }
   

@@ -3,6 +3,119 @@
 let spCurrentTab = 'fields';
 let spPanelDragBound = false;
 
+// F1: unsaved edits carried across tab switches (and across close/reopen) until the user
+// saves the owning tab, presses 清除更改, or reloads. Overlays effectiveConfig() at render.
+// null = no pending edits. F2: spCurrentTabEdited flags the mounted tab as touched since its
+// last save/clear, so the "未保存" cue can show before the first tab switch captures a draft.
+let spPanelDraft = null;
+let spCurrentTabEdited = false;
+
+// Which config keys each tab owns — used to clear only that tab's draft after its save.
+const SP_DRAFT_KEYS = {
+  fields: ['fields'],
+  styles: ['theme', 'designMode', 'renderMode', 'htmlTemplate'],
+  generate: [
+    'defaultPromptInChatDepth', 'defaultPromptRole', 'defaultPromptContent', 'retryIncludePrev',
+    'apiMode', 'apiOpenaiUrl', 'apiOpenaiKey', 'apiOpenaiModel',
+  ],
+};
+
+/** effectiveConfig() with any pending draft edits overlaid (F1). */
+function spDraftedConfig() {
+  const base = effectiveConfig();
+  if (!spPanelDraft) return base;
+  const out = { ...base, ...spPanelDraft };
+  if (spPanelDraft.theme) out.theme = { ...(base.theme || {}), ...spPanelDraft.theme };
+  return out;
+}
+
+/** Any unsaved edits present (current tab touched, or a stashed draft from another tab)? */
+function spPanelHasUnsaved() {
+  return spCurrentTabEdited || (!!spPanelDraft && Object.keys(spPanelDraft).length > 0);
+}
+
+/** Show/hide the header "未保存" cue + 清除更改 button to match the dirty state (F2). */
+function spUpdateDirtyCue() {
+  const doc = chatDoc();
+  const dirty = spPanelHasUnsaved();
+  const cue = doc.getElementById('sp-unsaved-cue');
+  const clr = doc.getElementById('sp-panel-clear');
+  if (cue) cue.style.display = dirty ? '' : 'none';
+  if (clr) clr.style.display = dirty ? '' : 'none';
+}
+
+/** Read the current theme knobs straight from the 样式-tab DOM (shared by capture + preview). */
+function spCaptureThemeFromDom(doc) {
+  const accentEl = doc.getElementById('sp-theme-accent');
+  if (!accentEl) return null;
+  const val = (id) => { const el = doc.getElementById(id); return el ? el.value : ''; };
+  const overrideColor = (id) => { const el = doc.getElementById(id); return el && el.dataset.spOverridden === '1' ? el.value : ''; };
+  const foldEl = doc.getElementById('sp-theme-fold');
+  const theme = {
+    accent: val('sp-theme-accent') || SP_THEME_DEFAULTS.accent,
+    radius: val('sp-theme-radius') !== '' ? Number(val('sp-theme-radius')) : SP_THEME_DEFAULTS.radius,
+    textSize: val('sp-theme-size') !== '' ? Number(val('sp-theme-size')) : SP_THEME_DEFAULTS.textSize,
+    font: String(val('sp-theme-font') || '').trim(),
+    buttonsCollapsed: !!(foldEl && foldEl.checked),
+  };
+  const COLOR_KEY = {
+    'sp-theme-headc': 'headerColor', 'sp-theme-borderc': 'borderColor', 'sp-theme-textc': 'textColor',
+    'sp-theme-btnc': 'btnColor', 'sp-theme-btnbc': 'btnBorderColor', 'sp-theme-btntc': 'btnTextColor',
+  };
+  Object.keys(COLOR_KEY).forEach((id) => { theme[COLOR_KEY[id]] = overrideColor(id); });
+  return theme;
+}
+
+/** Stash the currently mounted tab's DOM values into the draft (F1). */
+function spCaptureCurrentTabDraft() {
+  const doc = chatDoc();
+  const draft = spPanelDraft || {};
+  const val = (id) => { const el = doc.getElementById(id); return el ? el.value : undefined; };
+  const radio = (name) => { const el = doc.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : undefined; };
+  if (spCurrentTab === 'fields') {
+    if (doc.getElementById('sp-field-rows')) draft.fields = spCollectFieldsFromTable();
+  } else if (spCurrentTab === 'styles') {
+    if (doc.getElementById('sp-theme-accent') || doc.getElementById('sp-html-template')) {
+      const theme = spCaptureThemeFromDom(doc);
+      if (theme) draft.theme = theme;
+      const dm = radio('sp-design-mode'); if (dm) draft.designMode = dm;
+      const rm = radio('sp-render-mode'); if (rm) draft.renderMode = rm;
+      const tplEl = doc.getElementById('sp-html-template'); if (tplEl) draft.htmlTemplate = tplEl.value;
+    }
+  } else if (spCurrentTab === 'generate') {
+    const depth = val('sp-inject-depth'); if (depth !== undefined) draft.defaultPromptInChatDepth = Math.max(0, Math.min(999, Number(depth) || 0));
+    const role = val('sp-inject-role'); if (role !== undefined) draft.defaultPromptRole = role;
+    const dp = val('sp-def-prompt'); if (dp !== undefined) draft.defaultPromptContent = dp;
+    const rp = radio('sp-retry-prev'); if (rp !== undefined) draft.retryIncludePrev = rp !== '0';
+    const am = radio('sp-api-mode'); if (am) draft.apiMode = am;
+    const url = val('sp-api-url'); if (url !== undefined) draft.apiOpenaiUrl = url;
+    const key = val('sp-api-key'); if (key !== undefined) draft.apiOpenaiKey = key;
+    const sel = val('sp-api-model-select'); const custom = val('sp-api-model-custom');
+    if (sel !== undefined || custom !== undefined) draft.apiOpenaiModel = (custom && custom.trim()) ? custom.trim() : (sel || '');
+  }
+  spPanelDraft = Object.keys(draft).length ? draft : null;
+}
+
+/** Capture the current tab into the draft before its DOM is replaced/hidden (F1). */
+function spBeforeRerender() {
+  if (spCurrentTabEdited) { spCaptureCurrentTabDraft(); spCurrentTabEdited = false; }
+}
+
+/** A tab just saved — its draft is now persisted, so drop only that tab's keys (F1). */
+function spClearSavedTabDraft(tab) {
+  if (!spPanelDraft) return;
+  (SP_DRAFT_KEYS[tab] || []).forEach((k) => { delete spPanelDraft[k]; });
+  if (!Object.keys(spPanelDraft).length) spPanelDraft = null;
+}
+
+/** 清除更改: discard all unsaved edits and re-render from the saved config (F1). */
+function spDiscardDraft() {
+  spPanelDraft = null;
+  spCurrentTabEdited = false;
+  renderPanelContent();
+  spToast('已丢弃未保存的更改', '状态面板');
+}
+
 function ensurePanelShell() {
   const doc = chatDoc();
   if (doc.getElementById(SP_PANEL_ID)) return;
@@ -12,6 +125,8 @@ function ensurePanelShell() {
   panel.innerHTML = `
     <div class="sp-panel-header" id="sp-panel-header">
       <span class="sp-panel-title">状态面板</span>
+      <span class="sp-unsaved-cue" id="sp-unsaved-cue" style="display:none" title="有未保存的更改 — 记得在对应页点「保存」">● 未保存</span>
+      <button type="button" class="sp-panel-clear" id="sp-panel-clear" style="display:none" title="丢弃所有未保存的更改（不影响已保存到角色卡的内容）">清除更改</button>
       <button type="button" class="sp-panel-close" id="sp-panel-close" title="关闭">✕</button>
     </div>
     <div class="sp-tabs" id="sp-tabs"></div>
@@ -26,6 +141,26 @@ function ensurePanelShell() {
   });
 
   doc.getElementById('sp-panel-close').addEventListener('click', () => closePanel());
+
+  const clearBtn = doc.getElementById('sp-panel-clear');
+  if (clearBtn) clearBtn.addEventListener('click', () => spDiscardDraft());
+
+  // F2: any real edit inside the body marks the current tab dirty and shows the cue.
+  // Readonly previews (inject/status-block/model-list) and the live style preview iframe
+  // are excluded so programmatic updates don't raise a false "未保存".
+  const body = doc.getElementById('sp-panel-body');
+  if (body) {
+    const onEdit = (e) => {
+      const t = e.target;
+      if (!t || !/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+      if (t.readOnly || t.disabled) return;
+      if (t.closest && t.closest('#sp-style-preview, .sp-preview-wrap, #sp-api-models')) return;
+      spCurrentTabEdited = true;
+      spUpdateDirtyCue();
+    };
+    body.addEventListener('input', onEdit);
+    body.addEventListener('change', onEdit);
+  }
 
   if (!spPanelDragBound) {
     spPanelDragBound = true;
@@ -117,7 +252,10 @@ function renderTabButtons() {
     .join('');
   tabs.querySelectorAll('[data-sp-tab]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      spCurrentTab = btn.getAttribute('data-sp-tab') || 'fields';
+      const next = btn.getAttribute('data-sp-tab') || 'fields';
+      if (next === spCurrentTab) return;
+      spBeforeRerender(); // stash this tab's edits so switching never loses progress (F1)
+      spCurrentTab = next;
       renderPanelContent();
     });
   });
@@ -127,7 +265,7 @@ function renderPanelContent() {
   const doc = chatDoc();
   const body = doc.getElementById('sp-panel-body');
   if (!body) return;
-  const cfg = effectiveConfig();
+  const cfg = spDraftedConfig(); // seed inputs from saved config + any pending draft (F1)
 
   if (spCurrentTab === 'fields') {
     body.innerHTML = spRenderFieldsTab(cfg);
@@ -143,6 +281,7 @@ function renderPanelContent() {
     spBindManageTab();
   }
   renderTabButtons();
+  spUpdateDirtyCue();
 }
 
 /** Options for OpenAI-style model dropdown (populated via TavernHelper.getModelList). */
@@ -159,41 +298,6 @@ function spApiModelSelectInnerHtml(cfg, fetchedList) {
   }
   if (cur && !seen.has(cur)) {
     parts.push(`<option value="${esc(cur)}" selected>${esc(cur)} （已保存）</option>`);
-  }
-  return parts.join('');
-}
-
-/** Datalist options: only field names are interpolated into templates / JSON schema for the model. */
-function spFieldMetaText(f) {
-  const isNum = f.type === 'number';
-  const isEnum = f.type === 'enum';
-  const defS = isNum
-    ? String(Number.isFinite(Number(f.value)) ? Number(f.value) : 0)
-    : String(f.value ?? '');
-  let meta = isNum ? 'number' : isEnum ? 'enum' : 'text';
-  if (isEnum) {
-    const opts = typeof spFieldEnumOptions === 'function' ? spFieldEnumOptions(f) : [];
-    if (opts.length) meta += ` · ${opts.length} 个选项`;
-  } else {
-    meta += ` · 示例：${defS || '（空）'}`;
-  }
-  if (isNum) {
-    const lo = Number(f.min);
-    const hi = Number(f.max);
-    if (Number.isFinite(lo) && Number.isFinite(hi)) meta += ` · 范围 ${lo}–${hi}`;
-    else if (Number.isFinite(lo)) meta += ` · 最小 ${lo}`;
-    else if (Number.isFinite(hi)) meta += ` · 最大 ${hi}`;
-  }
-  return meta;
-}
-
-function spLiveTokenDatalistHtml(fields) {
-  const parts = [];
-  for (const f of fields || []) {
-    const n = String(f.name || '').trim();
-    if (!n) continue;
-    const tok = '{' + n + '}';
-    parts.push(`<option value="${esc(tok)}">${esc(tok + ' — 消息值 · ' + spFieldMetaText(f))}</option>`);
   }
   return parts.join('');
 }
@@ -577,11 +681,10 @@ function spBindFieldsTab() {
   }
 
   // Status block for greeting prefill: current editor rows (incl. unsaved edits),
-  // one key per field, value = the field's 示例值. Uses the configured tag so ports
-  // with a custom tagStart/tagEnd copy the right markers.
+  // one key per field, value = the field's 示例值. Always the default invisible markers (S13).
   const buildStatusBlock = () => {
     const fields = spCollectFieldsFromTable();
-    const tag = spTagPair(effectiveConfig());
+    const tag = spTagPair();
     const obj = {};
     fields.forEach((f) => {
       if (f.type === 'number') {
@@ -634,7 +737,20 @@ function spBindFieldsTab() {
     save.addEventListener('click', async () => {
       const fields = spCollectFieldsFromTable();
       try {
-        await spCharDefSave({ fields });
+        const cur = effectiveConfig();
+        const patch = { fields };
+        // F2: on first setup (simple mode, no template yet) seed a default layout + default
+        // colours so the panel renders correctly the moment fields are saved — no separate
+        // trip to the 样式 tab needed. Existing templates/themes are left untouched.
+        if (cur.designMode !== 'advanced' && fields.length && !String(cur.htmlTemplate || '').trim()) {
+          const theme = spLayoutTheme(cur); // saved theme over defaults → default colours if unset
+          patch.htmlTemplate = spGenerateLayoutHtml(fields, theme);
+          patch.designMode = 'simple';
+          if (!cur.theme || !Object.keys(cur.theme).length) patch.theme = theme;
+        }
+        await spCharDefSave(patch);
+        spClearSavedTabDraft('fields');
+        spCurrentTabEdited = false;
         spToast('字段已保存到角色卡', '状态面板');
         renderPanelContent();
         refreshAllAssistantPanels();
@@ -775,6 +891,8 @@ function spThemeColorField(label, id, value, fallback, followsAccent) {
     `<label>${esc(label)} ` +
     `<input type="color" id="${id}" value="${esc(shown)}"` +
       ` data-sp-overridden="${overridden ? '1' : ''}" data-sp-follows-accent="${followsAccent ? '1' : ''}" data-sp-fallback="${esc(fallback)}"/>` +
+    `<input type="text" class="sp-color-hex" data-sp-forcolor="${id}" value="${esc(shown)}"` +
+      ` spellcheck="false" autocomplete="off" maxlength="7" aria-label="${esc(label)} 十六进制颜色"/>` +
     `<button type="button" data-sp-reset="${id}" title="恢复跟随（主色/默认）"` +
       ` style="all:unset;cursor:pointer;margin-left:2px;font-size:12px;opacity:${overridden ? '.75' : '.3'};">↺</button>` +
     `</label>`
@@ -782,7 +900,6 @@ function spThemeColorField(label, id, value, fallback, followsAccent) {
 }
 
 function spRenderStylesTab(cfg) {
-  const liveOpts = spLiveTokenDatalistHtml(cfg.fields || []);
   const t = spLayoutTheme(cfg);
   const accent7 = spHex7(t.accent, SP_THEME_DEFAULTS.accent);
   const isAdvanced = cfg.designMode === 'advanced';
@@ -805,7 +922,7 @@ function spRenderStylesTab(cfg) {
     <div id="sp-design-simple" style="${isAdvanced ? 'display:none' : ''}">
       <label class="sp-label">主题</label>
       <div class="sp-row sp-theme-row">
-        <label>主色 <input type="color" id="sp-theme-accent" value="${esc(accent7)}"/></label>
+        <label>主色 <input type="color" id="sp-theme-accent" value="${esc(accent7)}"/><input type="text" class="sp-color-hex" data-sp-forcolor="sp-theme-accent" value="${esc(accent7)}" spellcheck="false" autocomplete="off" maxlength="7" aria-label="主色 十六进制颜色"/></label>
         <label>圆角 <input type="number" id="sp-theme-radius" min="0" max="32" step="1" value="${esc(String(t.radius))}" style="width:4rem"/></label>
         <label>字号 <input type="number" id="sp-theme-size" min="10" max="20" step="1" value="${esc(String(t.textSize))}" style="width:4rem"/></label>
       </div>
@@ -848,10 +965,6 @@ function spRenderStylesTab(cfg) {
         <button type="button" class="sp-btn sp-btn-sm" id="sp-import-html-btn">导入 .html 文件…</button>
       </div>
       <textarea id="sp-html-template" spellcheck="false">${esc(cfg.htmlTemplate || '')}</textarea>
-      <div class="sp-row sp-insert-row">
-        <input type="text" list="sp-dl-live-tokens" id="sp-insert-live" class="sp-insert-field-brace" placeholder="插入 {name}（实时值）…" />
-        <datalist id="sp-dl-live-tokens">${liveOpts}</datalist>
-      </div>
     </div>
     <div id="sp-token-warnings" class="sp-token-warnings" style="display:none"></div>
     <div>
@@ -889,41 +1002,16 @@ function spBindStylesTab(cfg) {
   const tpl = doc.getElementById('sp-html-template');
 
   // Overridable colour knobs (S7). Un-overridden ones store '' so spBuildThemeVarBlock
-  // derives them from 主色 (or a neutral default for text colours).
+  // derives them from 主色 (or a neutral default for text colours). The id→theme-key map
+  // lives in spCaptureThemeFromDom (the shared capture path).
   const SP_COLOR_KNOBS = ['sp-theme-headc', 'sp-theme-borderc', 'sp-theme-textc', 'sp-theme-btnc', 'sp-theme-btnbc', 'sp-theme-btntc'];
-  const COLOR_KEY = {
-    'sp-theme-headc': 'headerColor',
-    'sp-theme-borderc': 'borderColor',
-    'sp-theme-textc': 'textColor',
-    'sp-theme-btnc': 'btnColor',
-    'sp-theme-btnbc': 'btnBorderColor',
-    'sp-theme-btntc': 'btnTextColor',
-  };
 
   /** Theme knobs as currently shown in the 简易 section — shared by preview, regen and 保存.
    *  Overridable colours store '' (= follow accent/default) until the author edits them.
    *  Falls back to the saved cfg.theme when the 简易 knobs aren't in the DOM (高级 mode). */
   const collectTheme = () => {
-    const accentEl = doc.getElementById('sp-theme-accent');
-    if (!accentEl) return (cfg.theme && typeof cfg.theme === 'object') ? cfg.theme : {};
-    const val = (id) => {
-      const el = doc.getElementById(id);
-      return el ? el.value : '';
-    };
-    const overrideColor = (id) => {
-      const el = doc.getElementById(id);
-      return el && el.dataset.spOverridden === '1' ? el.value : '';
-    };
-    const foldEl = doc.getElementById('sp-theme-fold');
-    const theme = {
-      accent: val('sp-theme-accent') || SP_THEME_DEFAULTS.accent,
-      radius: val('sp-theme-radius') !== '' ? Number(val('sp-theme-radius')) : SP_THEME_DEFAULTS.radius,
-      textSize: val('sp-theme-size') !== '' ? Number(val('sp-theme-size')) : SP_THEME_DEFAULTS.textSize,
-      font: String(val('sp-theme-font') || '').trim(),
-      buttonsCollapsed: !!(foldEl && foldEl.checked),
-    };
-    SP_COLOR_KNOBS.forEach((id) => { theme[COLOR_KEY[id]] = overrideColor(id); });
-    return theme;
+    const t = spCaptureThemeFromDom(doc);
+    return t || ((cfg.theme && typeof cfg.theme === 'object') ? cfg.theme : {});
   };
 
   const updateTokenWarnings = () => {
@@ -1026,6 +1114,7 @@ function spBindStylesTab(cfg) {
       const accentEl = doc.getElementById('sp-theme-accent');
       const accent7 = accentEl ? spHex7(accentEl.value, SP_THEME_DEFAULTS.accent) : SP_THEME_DEFAULTS.accent;
       el.value = el.dataset.spFollowsAccent === '1' ? accent7 : spHex7(el.dataset.spFallback, accent7);
+      syncHexFor(el.id);
       regenSimple();
     });
   });
@@ -1036,7 +1125,7 @@ function spBindStylesTab(cfg) {
       const a7 = spHex7(accentInput.value, SP_THEME_DEFAULTS.accent);
       SP_COLOR_KNOBS.forEach((id) => {
         const el = doc.getElementById(id);
-        if (el && el.dataset.spOverridden !== '1' && el.dataset.spFollowsAccent === '1') el.value = a7;
+        if (el && el.dataset.spOverridden !== '1' && el.dataset.spFollowsAccent === '1') { el.value = a7; syncHexFor(id); }
       });
     });
   }
@@ -1046,6 +1135,32 @@ function spBindStylesTab(cfg) {
       el.addEventListener('input', regenSimple);
       el.addEventListener('change', regenSimple);
     }
+  });
+
+  // B1 (mobile): pair every colour well with a hex text field so colours can be typed or
+  // pasted where the native picker degrades to a handful of swatches. Editing either side
+  // drives the same override/regen path the picker already uses.
+  const isHex7 = (v) => /^#?[0-9a-fA-F]{6}$/.test(String(v || '').trim());
+  const norm7 = (v) => {
+    let s = String(v || '').trim().toLowerCase();
+    if (s && s[0] !== '#') s = '#' + s;
+    return s;
+  };
+  const syncHexFor = (id) => {
+    const c = doc.getElementById(id);
+    const h = doc.querySelector('.sp-color-hex[data-sp-forcolor="' + id + '"]');
+    if (c && h) h.value = spHex7(c.value, h.value);
+  };
+  doc.querySelectorAll('.sp-color-hex').forEach((hex) => {
+    const id = hex.getAttribute('data-sp-forcolor');
+    const color = doc.getElementById(id);
+    if (!color) return;
+    color.addEventListener('input', () => { hex.value = spHex7(color.value, hex.value); });
+    hex.addEventListener('input', () => {
+      if (!isHex7(hex.value)) return;
+      color.value = norm7(hex.value);
+      color.dispatchEvent(new Event('input')); // reuse picker's override + regen listeners
+    });
   });
 
   const genBtn = doc.getElementById('sp-gen-layout');
@@ -1069,21 +1184,6 @@ function spBindStylesTab(cfg) {
     });
   }
 
-  const insertAt = (input) => {
-    if (!input || !tpl) return;
-    input.addEventListener('change', () => {
-      const v = (input.value || '').trim();
-      if (!v) return;
-      const start = tpl.selectionStart ?? tpl.value.length;
-      const end = tpl.selectionEnd ?? tpl.value.length;
-      tpl.value = tpl.value.slice(0, start) + v + tpl.value.slice(end);
-      tpl.dispatchEvent(new Event('input'));
-      input.value = '';
-      tpl.focus();
-    });
-  };
-  insertAt(doc.getElementById('sp-insert-live'));
-
   const save = doc.getElementById('sp-save-styles');
   if (save) {
     save.addEventListener('click', async () => {
@@ -1106,6 +1206,9 @@ function spBindStylesTab(cfg) {
           theme: collectTheme(),
         });
         spEngineSave({ renderMode: renderModeEl ? renderModeEl.value : 'last_only' });
+        spClearSavedTabDraft('styles');
+        spCurrentTabEdited = false;
+        spUpdateDirtyCue();
         spToast('样式已保存到角色卡', '状态面板');
         injectAuthorCss();
         refreshAllAssistantPanels();
@@ -1181,14 +1284,6 @@ function spRenderGenerateTab(cfg) {
       <textarea id="sp-def-prompt" spellcheck="false">${esc(cfg.defaultPromptContent || '')}</textarea>
     </div>
     <div>
-      <label class="sp-label">状态块标记</label>
-      <p class="sp-help-p" style="font-size:11px;opacity:.75;margin:0 0 6px 0;">引擎读取这对标记之间的状态，留空则使用默认的隐形标记。</p>
-      <div class="sp-row sp-tag-row">
-        <input type="text" id="sp-tag-start" value="${esc(cfg.tagStart || '')}" placeholder="${esc(MARKER_START)}" autocomplete="off" spellcheck="false" />
-        <input type="text" id="sp-tag-end" value="${esc(cfg.tagEnd || '')}" placeholder="${esc(MARKER_END)}" autocomplete="off" spellcheck="false" />
-      </div>
-    </div>
-    <div>
       <label class="sp-label">重试上下文</label>
       <div class="sp-row">
         <label><input type="radio" name="sp-retry-prev" value="1" ${cfg.retryIncludePrev !== false ? 'checked' : ''}/> 包含上一条已知状态（数值更连贯）</label>
@@ -1230,17 +1325,13 @@ function spRenderGenerateTab(cfg) {
   `;
 }
 
-/** Compose the effective config with the 生成 tab's live (unsaved) instruction + tag
- *  inputs so the preview shows exactly what will be injected. */
+/** Compose the effective config with the 生成 tab's live (unsaved) instruction text
+ *  so the preview shows exactly what will be injected. */
 function spGenerateDraftConfig(doc) {
   const base = effectiveConfig();
   const defTa = doc.getElementById('sp-def-prompt');
-  const tagStartEl = doc.getElementById('sp-tag-start');
-  const tagEndEl = doc.getElementById('sp-tag-end');
   return deepMerge(base, {
     defaultPromptContent: defTa ? defTa.value : base.defaultPromptContent,
-    tagStart: tagStartEl ? tagStartEl.value.trim() : base.tagStart,
-    tagEnd: tagEndEl ? tagEndEl.value.trim() : base.tagEnd,
   });
 }
 
@@ -1332,10 +1423,6 @@ function spBindGenerateTab() {
   const bindPreview = () => { spUpdateInjectPreview(); };
   const ta = doc.getElementById('sp-def-prompt');
   if (ta) ta.addEventListener('input', bindPreview);
-  ['sp-tag-start', 'sp-tag-end'].forEach((id) => {
-    const el = doc.getElementById(id);
-    if (el) el.addEventListener('input', bindPreview);
-  });
   bindPreview();
 
   // ── Save: engine keys (role/depth/API) via spEngineSave; card keys via spCharDefSave ──
@@ -1350,8 +1437,6 @@ function spBindGenerateTab() {
       const custom = customEl && String(customEl.value || '').trim();
       const model = custom || (selEl && selEl.value) || '';
       const defTa = doc.getElementById('sp-def-prompt');
-      const tagStartEl = doc.getElementById('sp-tag-start');
-      const tagEndEl = doc.getElementById('sp-tag-end');
       const retryPrevEl = doc.querySelector('input[name="sp-retry-prev"]:checked');
       try {
         // Injection role/depth + API credentials are per-user engine config.
@@ -1363,18 +1448,19 @@ function spBindGenerateTab() {
           apiOpenaiKey: doc.getElementById('sp-api-key') ? doc.getElementById('sp-api-key').value : '',
           apiOpenaiModel: model,
         });
-        // Instruction/tag/example/retry-context are authored content that travels with the card.
+        // Instruction/retry-context are authored content that travels with the card.
         if (spCharDefLoad()) {
           await spCharDefSave({
-            tagStart: tagStartEl ? tagStartEl.value.trim() : '',
-            tagEnd: tagEndEl ? tagEndEl.value.trim() : '',
             defaultPromptContent: defTa ? defTa.value : '',
             retryIncludePrev: !retryPrevEl || retryPrevEl.value !== '0',
           });
           spToast('已保存生成设置', '状态面板');
         } else {
-          spToast('已保存引擎设置（当前角色没有面板定义，标记/指令等角色卡字段未写入）', '状态面板');
+          spToast('已保存引擎设置（当前角色没有面板定义，指令等角色卡字段未写入）', '状态面板');
         }
+        spClearSavedTabDraft('generate');
+        spCurrentTabEdited = false;
+        spUpdateDirtyCue();
         spSyncExtensionPrompt(); // role/depth/instruction may have changed — republish
         refreshAllAssistantPanels();
         bindPreview();
@@ -1598,6 +1684,7 @@ function openPanel(tab) {
 }
 
 function closePanel() {
+  spBeforeRerender(); // keep current-tab edits alive across close/reopen (F1)
   const doc = chatDoc();
   const panel = doc.getElementById(SP_PANEL_ID);
   if (!panel) return;

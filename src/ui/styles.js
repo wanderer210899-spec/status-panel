@@ -36,31 +36,32 @@ function injectStylesOnce() {
       '.sp-json-tok-unknown{color:#c0392b;text-decoration:underline wavy #c0392b;}\n' +
       '.sp-json-tok-caret{color:#c0392b;font-weight:bold;}\n' +
       // Edit modal — host doc, not iframe; same z-index family as the clear modal.
-      // Theme via --sp-* vars set inline on the overlay (spShowEditModal) so the editor
-      // matches the active card's panel; opaque surface kept (it floats over the chat).
+      // Theme: inherits the active SillyTavern theme (--SmartTheme* vars), falling back to the
+      // card's panel --sp-* vars, then to a literal dark surface. (S6 amended 2026-07-09 — the
+      // editor used to match the card panel; user chose ST-theme consistency with the settings window.)
       // NOTE: height is 100vh, NOT inset:0/bottom:0. ST puts a transform+perspective on <html>,
       // which makes <html> the containing block for our position:fixed overlay; that box is
       // height-collapsed, so inset:0 gave the overlay ~0 height and the modal centred off-screen.
       // vh is viewport-relative regardless of containing block. Do not revert to inset:0.
       '.sp-edit-modal{position:fixed;top:0;left:0;right:0;height:100vh;background:rgba(0,0,0,.65);z-index:100001;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box;}\n' +
-      '.sp-edit-modal .sp-edit-box{background:#1b1d27;border:1px solid var(--sp-border-color,rgba(255,255,255,.15));border-radius:var(--sp-radius,14px);padding:20px 22px;' +
-        'max-width:520px;width:92%;max-height:88vh;display:flex;flex-direction:column;color:var(--sp-text-color,rgba(255,255,255,.92));' +
-        'font:13px/1.45 var(--sp-font,system-ui,Segoe UI,Roboto,sans-serif);box-shadow:0 8px 32px rgba(0,0,0,.5);}\n' +
-      '.sp-edit-modal .sp-em-title{margin:0 0 4px;font-size:15px;font-weight:650;color:var(--sp-title-color,var(--sp-accent,inherit));}\n' +
+      '.sp-edit-modal .sp-edit-box{background:var(--SmartThemeBlurTintColor,#1b1d27);border:1px solid var(--SmartThemeBorderColor,var(--sp-border-color,rgba(255,255,255,.15)));border-radius:var(--sp-radius,14px);padding:20px 22px;' +
+        'max-width:520px;width:92%;max-height:88vh;display:flex;flex-direction:column;color:var(--SmartThemeBodyColor,var(--sp-text-color,rgba(255,255,255,.92)));' +
+        'font:13px/1.45 var(--sp-font,system-ui,Segoe UI,Roboto,sans-serif);box-shadow:0 8px 32px var(--SmartThemeShadowColor,rgba(0,0,0,.5));}\n' +
+      '.sp-edit-modal .sp-em-title{margin:0 0 4px;font-size:15px;font-weight:650;color:var(--SmartThemeQuoteColor,var(--sp-title-color,var(--sp-accent,inherit)));}\n' +
       '.sp-edit-modal .sp-em-sub{margin:0 0 14px;font-size:11px;opacity:.7;}\n' +
       '.sp-edit-modal .sp-em-fields{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-right:4px;}\n' +
       '.sp-edit-modal .sp-em-row{display:flex;flex-direction:column;gap:4px;}\n' +
       '.sp-edit-modal .sp-em-label{font:600 11px/1.1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em;opacity:.75;}\n' +
-      '.sp-edit-modal .sp-em-input{box-sizing:border-box;width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--sp-border-color,rgba(255,255,255,.18));' +
-        'background:rgba(0,0,0,.32);color:var(--sp-text-color,rgba(255,255,255,.95));font:12px/1.4 ui-monospace,monospace;}\n' +
+      '.sp-edit-modal .sp-em-input{box-sizing:border-box;width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--SmartThemeBorderColor,var(--sp-border-color,rgba(255,255,255,.18)));' +
+        'background:var(--black30a,rgba(0,0,0,.32));color:var(--SmartThemeBodyColor,var(--sp-text-color,rgba(255,255,255,.95)));font:12px/1.4 ui-monospace,monospace;}\n' +
       '.sp-edit-modal .sp-em-textarea{min-height:54px;resize:vertical;}\n' +
-      '.sp-edit-modal .sp-em-input:focus{outline:1px solid var(--sp-accent,rgba(160,140,255,.6));}\n' +
+      '.sp-edit-modal .sp-em-input:focus{outline:1px solid var(--SmartThemeQuoteColor,var(--sp-accent,rgba(160,140,255,.6)));}\n' +
       '.sp-edit-modal .sp-em-hint{font-size:10px;opacity:.55;}\n' +
-      '.sp-edit-modal .sp-em-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);}\n' +
+      '.sp-edit-modal .sp-em-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--SmartThemeBorderColor,rgba(255,255,255,.08));}\n' +
       '.sp-edit-modal .sp-em-btn{all:unset;cursor:pointer;box-sizing:border-box;padding:7px 14px;border-radius:9px;font-size:12px;' +
-        'border:1px solid var(--sp-btn-border-color,rgba(255,255,255,.18));background:var(--sp-btn-color,rgba(0,0,0,.3));color:var(--sp-btn-text-color,inherit);}\n' +
+        'border:1px solid var(--SmartThemeBorderColor,var(--sp-btn-border-color,rgba(255,255,255,.18)));background:var(--sp-btn-color,rgba(0,0,0,.3));color:var(--sp-btn-text-color,inherit);}\n' +
       '.sp-edit-modal .sp-em-btn:hover{filter:brightness(1.15);}\n' +
-      '.sp-edit-modal .sp-em-btn-save{border-color:var(--sp-accent,rgba(160,140,255,.45));background:color-mix(in srgb, var(--sp-accent,#6e5ac8) 32%, transparent);font-weight:600;}\n' +
+      '.sp-edit-modal .sp-em-btn-save{border-color:var(--SmartThemeQuoteColor,var(--sp-accent,rgba(160,140,255,.45)));background:color-mix(in srgb, var(--SmartThemeQuoteColor,var(--sp-accent,#6e5ac8)) 32%, transparent);font-weight:600;}\n' +
       '.sp-edit-modal .sp-em-btn-reset{opacity:.7;font-size:11px;}\n';
     doc.head.appendChild(st);
   }
@@ -76,12 +77,21 @@ function injectStylesOnce() {
         display: none;
         flex-direction: column;
         border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.14);
-        background: rgba(22,22,28,0.96);
-        box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.14));
+        /* B3: guarantee a near-opaque surface (≥0.8) even when the theme's tint var is
+           translucent, by compositing the tint over itself several times. When the ST var
+           is absent the gradient layers resolve to transparent, so the shipped fallback is
+           exactly the original single opaque-ish surface — look unchanged. */
+        background-color: var(--SmartThemeBlurTintColor, rgba(22,22,28,0.96));
+        background-image:
+          linear-gradient(var(--SmartThemeBlurTintColor, transparent), var(--SmartThemeBlurTintColor, transparent)),
+          linear-gradient(var(--SmartThemeBlurTintColor, transparent), var(--SmartThemeBlurTintColor, transparent)),
+          linear-gradient(var(--SmartThemeBlurTintColor, transparent), var(--SmartThemeBlurTintColor, transparent)),
+          linear-gradient(var(--SmartThemeBlurTintColor, transparent), var(--SmartThemeBlurTintColor, transparent));
+        box-shadow: 0 12px 40px var(--SmartThemeShadowColor, rgba(0,0,0,0.45));
         overflow: hidden;
-        font: 13px/1.35 system-ui, Segoe UI, Roboto, sans-serif;
-        color: rgba(255,255,255,0.92);
+        font: 13px/1.35 var(--mainFontFamily, system-ui, Segoe UI, Roboto, sans-serif);
+        color: var(--SmartThemeBodyColor, rgba(255,255,255,0.92));
       }
       #${SP_PANEL_ID}.sp-panel-open { display: flex; }
       #${SP_PANEL_ID} .sp-panel-header {
@@ -92,8 +102,8 @@ function injectStylesOnce() {
         cursor: move;
         user-select: none;
         touch-action: none;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
-        background: rgba(0,0,0,0.25);
+        border-bottom: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
+        background: var(--black30a, rgba(0,0,0,0.25));
       }
       #${SP_PANEL_ID} .sp-panel-title { font-weight: 600; flex: 1; }
       #${SP_PANEL_ID} .sp-panel-close {
@@ -104,11 +114,21 @@ function injectStylesOnce() {
         opacity: 0.85;
       }
       #${SP_PANEL_ID} .sp-panel-close:hover { background: rgba(255,255,255,0.08); }
+      /* F2: unsaved-changes cue + F1: 清除更改 button, top-right of the header. */
+      #${SP_PANEL_ID} .sp-unsaved-cue {
+        font-size: 11px; font-weight: 600; color: #f0c674; opacity: 0.95; white-space: nowrap;
+      }
+      #${SP_PANEL_ID} .sp-panel-clear {
+        all: unset; cursor: pointer; padding: 4px 10px; border-radius: 8px; font-size: 11px; opacity: 0.85;
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.18));
+        background: var(--black30a, rgba(0,0,0,0.25));
+      }
+      #${SP_PANEL_ID} .sp-panel-clear:hover { opacity: 1; background: rgba(255,255,255,0.08); }
       #${SP_PANEL_ID} .sp-tabs {
         display: flex;
         gap: 4px;
         padding: 8px 8px 0;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
+        border-bottom: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
         flex-wrap: wrap;
       }
       #${SP_PANEL_ID} .sp-tab {
@@ -142,115 +162,33 @@ function injectStylesOnce() {
         box-sizing: border-box;
         padding: 8px;
         border-radius: 8px;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(0,0,0,0.35);
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.12));
+        background: var(--black30a, rgba(0,0,0,0.35));
         color: inherit;
         font: 12px/1.35 ui-monospace, monospace;
       }
       #${SP_PANEL_ID} textarea { min-height: 72px; resize: vertical; }
-      #${SP_PANEL_ID} div.sp-prompt-preview {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 8px;
-        border-radius: 8px;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(0,0,0,0.35);
-        color: inherit;
-        min-height: 160px;
-        max-height: min(42vh, 420px);
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
-        touch-action: pan-y;
-        font: 11px/1.45 ui-monospace, monospace;
-      }
-      #${SP_PANEL_ID} .sp-prev-meta {
-        font-size: 10px; opacity: .62; margin-bottom: 8px; line-height: 1.4;
-      }
-      #${SP_PANEL_ID} .sp-prev-sec-head {
-        font: 700 9px/1 ui-monospace,monospace; text-transform: uppercase;
-        letter-spacing: .06em; opacity: .4; margin: 8px 0 4px;
-      }
-      #${SP_PANEL_ID} .sp-prev-block {
-        margin-bottom: 4px; border-radius: 5px; border-left: 3px solid;
-        padding: 5px 8px; word-break: break-word;
-      }
-      #${SP_PANEL_ID} .sp-prev-builtin { border-color: rgba(160,160,160,.4); background: rgba(255,255,255,.03); }
-      #${SP_PANEL_ID} .sp-prev-preset { border-color: rgba(80,140,220,.55); background: rgba(80,140,220,.07); }
-      #${SP_PANEL_ID} .sp-prev-sp { border-color: rgba(80,200,120,.55); background: rgba(80,200,120,.07); }
-      #${SP_PANEL_ID} .sp-prev-schema { border-color: rgba(220,160,50,.55); background: rgba(220,160,50,.07); }
-      #${SP_PANEL_ID} .sp-prev-inject { border-color: rgba(160,100,220,.55); background: rgba(160,100,220,.07); }
-      #${SP_PANEL_ID} .sp-prev-hdr {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-        margin-bottom: 3px; font-size: 10px;
-      }
-      #${SP_PANEL_ID} .sp-prev-idx { opacity: .4; font-size: 9px; }
-      #${SP_PANEL_ID} .sp-prev-badge {
-        display: inline-block; padding: 1px 5px; border-radius: 3px;
-        font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-      }
-      #${SP_PANEL_ID} .sp-badge-builtin { background: rgba(160,160,160,.2); color: rgba(200,200,200,.8); }
-      #${SP_PANEL_ID} .sp-badge-preset { background: rgba(80,140,220,.25); color: rgba(140,190,255,.9); }
-      #${SP_PANEL_ID} .sp-badge-sp { background: rgba(80,200,120,.25); color: rgba(130,230,160,.9); }
-      #${SP_PANEL_ID} .sp-badge-schema { background: rgba(220,160,50,.25); color: rgba(255,200,100,.9); }
-      #${SP_PANEL_ID} .sp-badge-inject { background: rgba(160,100,220,.25); color: rgba(200,160,255,.9); }
-      #${SP_PANEL_ID} .sp-prev-name { font-weight: 600; opacity: .9; }
-      #${SP_PANEL_ID} .sp-prev-source { opacity: .52; font-style: italic; }
-      #${SP_PANEL_ID} .sp-prev-depth { opacity: .5; font-size: 9px; }
-      #${SP_PANEL_ID} .sp-prev-placeholder {
-        font-style: italic; opacity: .52; font-size: 10px; line-height: 1.35;
-      }
-      #${SP_PANEL_ID} .sp-prev-content {
-        white-space: pre-wrap; font-size: 10px; opacity: .82;
-        max-height: 100px; overflow: hidden; line-height: 1.4;
-      }
-      #${SP_PANEL_ID} .sp-prev-schema-dt summary {
-        cursor: pointer; opacity: .68; font-size: 10px; margin-bottom: 2px;
-      }
-      #${SP_PANEL_ID} .sp-prev-schema-dt[open] .sp-prev-content { max-height: 220px; }
       #${SP_PANEL_ID} #sp-def-prompt { min-height: 140px; }
-      #${SP_PANEL_ID} .sp-preset-scroll {
-        min-height: 72px;
-        height: 160px;
-        max-height: 160px;
-        overflow: auto;
-        border: 1px solid rgba(255,255,255,.08);
-        padding: 6px;
-        border-radius: 8px;
-        box-sizing: border-box;
-      }
-      #${SP_PANEL_ID} .sp-preset-row {
-        display: flex; align-items: center; gap: 5px;
-        margin: 1px 0; padding: 3px 4px; border-radius: 4px; font-size: 11px;
-      }
-      #${SP_PANEL_ID} .sp-preset-row-builtin { opacity: .72; cursor: pointer; }
-      #${SP_PANEL_ID} .sp-preset-row-builtin:hover { background: rgba(255,255,255,.05); }
-      #${SP_PANEL_ID} .sp-preset-row-excluded { opacity: .38 !important; text-decoration: line-through; }
-      #${SP_PANEL_ID} .sp-preset-row-excluded .sp-preset-row-tag::after { content: ' ✕'; }
-      #${SP_PANEL_ID} .sp-preset-row-empty { opacity: .42; }
-      #${SP_PANEL_ID} .sp-preset-row-custom { cursor: pointer; }
-      #${SP_PANEL_ID} .sp-preset-row-custom:hover { background: rgba(255,255,255,.05); }
-      #${SP_PANEL_ID} .sp-prev-excluded-note { opacity: .7; font-size: 11px; }
-      #${SP_PANEL_ID} .sp-preset-row input[type="checkbox"] { flex-shrink: 0; width: auto; margin: 0; }
-      #${SP_PANEL_ID} .sp-preset-row-icon { opacity: .5; font-size: 10px; flex-shrink: 0; }
-      #${SP_PANEL_ID} .sp-preset-row-name {
-        flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      #${SP_PANEL_ID} .sp-preset-row-tag {
-        flex-shrink: 0; font-size: 9px; font-weight: 700; padding: 1px 4px;
-        border-radius: 3px; text-transform: uppercase; letter-spacing: .04em;
-      }
-      #${SP_PANEL_ID} .sp-preset-tag-builtin { background: rgba(160,160,160,.2); color: rgba(190,190,190,.7); }
-      #${SP_PANEL_ID} .sp-preset-tag-empty { background: rgba(100,100,100,.2); color: rgba(140,140,140,.6); }
-      #${SP_PANEL_ID} .sp-preset-tag-role { background: rgba(80,140,220,.2); color: rgba(140,190,255,.75); }
 #${SP_PANEL_ID} .sp-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+      /* B2/B4: keep an inline field group (label text + its control, or a check/radio +
+         its caption) on one aligned baseline. Selects/number inputs in a row must size to
+         content, not stretch to the global 100% width that would break the row. */
+      #${SP_PANEL_ID} .sp-row label { display: inline-flex; align-items: center; gap: 6px; }
+      #${SP_PANEL_ID} .sp-row label > select,
+      #${SP_PANEL_ID} .sp-row label > input[type="number"] { width: auto; }
+      /* B4: ST's global input styling otherwise leaks onto our check/radio boxes and
+         pushes them off their labels — reset size/margin so they sit beside the caption. */
+      #${SP_PANEL_ID} input[type="checkbox"], #${SP_PANEL_ID} input[type="radio"] {
+        width: auto; margin: 0; flex: 0 0 auto; vertical-align: middle;
+        accent-color: var(--SmartThemeQuoteColor, #7c9cff);
+      }
       #${SP_PANEL_ID} .sp-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
       #${SP_PANEL_ID} button.sp-btn {
         all: unset;
         cursor: pointer;
         padding: 6px 12px;
         border-radius: 8px;
-        border: 1px solid rgba(255,255,255,0.14);
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.14));
         background: rgba(255,255,255,0.06);
         font-size: 12px;
       }
@@ -259,11 +197,11 @@ function injectStylesOnce() {
       #${SP_PANEL_ID} .sp-import-row { display: flex; gap: 6px; margin-bottom: 4px; }
       #${SP_PANEL_ID} .sp-field-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
       #${SP_PANEL_ID} .sp-field-card {
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.1));
         border-radius: 10px;
         padding: 10px;
         min-width: 0;
-        background: rgba(0,0,0,0.18);
+        background: var(--black30a, rgba(0,0,0,0.18));
       }
       #${SP_PANEL_ID} .sp-field-card-head {
         display: grid;
@@ -285,7 +223,7 @@ function injectStylesOnce() {
         #${SP_PANEL_ID} .sp-field-row-split { grid-template-columns: 1fr; }
       }
       #${SP_PANEL_ID} .sp-field-cell { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-      #${SP_PANEL_ID} .sp-field-range { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); }
+      #${SP_PANEL_ID} .sp-field-range { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.06)); }
       #${SP_PANEL_ID} .sp-field-range .sp-label { margin-bottom: 4px; }
       #${SP_PANEL_ID} .sp-field-range-inputs {
         display: grid;
@@ -295,9 +233,8 @@ function injectStylesOnce() {
         min-width: 0;
       }
       #${SP_PANEL_ID} .sp-field-range-dash { opacity: 0.5; text-align: center; font-size: 12px; }
-      #${SP_PANEL_ID} .sp-insert-field-brace { min-width: 0; flex: 1; }
       #${SP_PANEL_ID} .sp-preview-wrap {
-        border: 1px solid rgba(255,255,255,0.12);
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.12));
         border-radius: 8px;
         min-height: 80px;
         max-height: min(44vh, 440px);
@@ -311,8 +248,8 @@ function injectStylesOnce() {
         opacity: 0.92;
         padding: 8px 10px;
         border-radius: 8px;
-        background: rgba(0,0,0,0.28);
-        border: 1px solid rgba(255,255,255,0.08);
+        background: var(--black30a, rgba(0,0,0,0.28));
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
       }
       #${SP_PANEL_ID} .sp-help-p { margin: 0 0 8px 0; }
       #${SP_PANEL_ID} .sp-help-p:last-child { margin-bottom: 0; }
@@ -324,10 +261,6 @@ function injectStylesOnce() {
         white-space: pre-wrap;
         word-break: break-word;
       }
-      #${SP_PANEL_ID} .sp-insert-row { align-items: center; margin-top: 6px; }
-      #${SP_PANEL_ID} .sp-preset-line { display: flex; align-items: flex-start; gap: 6px; margin: 2px 0; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
-      #${SP_PANEL_ID} .sp-preset-line:hover { background: rgba(255,255,255,0.05); }
-      #${SP_PANEL_ID} .sp-preset-line input[type="checkbox"] { flex-shrink: 0; margin-top: 2px; width: auto; }
       #${SP_PANEL_ID} .sp-token-warnings {
         font-size: 11px;
         line-height: 1.5;
@@ -344,18 +277,25 @@ function injectStylesOnce() {
         height: 26px;
         padding: 1px;
         border-radius: 6px;
-        border: 1px solid rgba(255,255,255,0.18);
-        background: rgba(0,0,0,0.3);
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.18));
+        background: var(--black30a, rgba(0,0,0,0.3));
         cursor: pointer;
         vertical-align: middle;
       }
-      #${SP_PANEL_ID} .sp-tag-row { align-items: center; }
-      #${SP_PANEL_ID} .sp-tag-row input { min-width: 0; flex: 1; font-family: ui-monospace, monospace; }
+      /* B1: hex companion for every colour well — the native picker degrades to a few
+         swatches on mobile, so authors can type/paste any colour here instead. */
+      #${SP_PANEL_ID} input[type="text"].sp-color-hex {
+        width: 5.5rem;
+        flex: 0 0 auto;
+        padding: 4px 6px;
+        font: 11px/1.3 ui-monospace, monospace;
+        text-transform: lowercase;
+      }
       #${SP_PANEL_ID} details.sp-adv {
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.1));
         border-radius: 8px;
         padding: 8px 10px;
-        background: rgba(0,0,0,0.18);
+        background: var(--black30a, rgba(0,0,0,0.18));
       }
       #${SP_PANEL_ID} details.sp-adv > summary {
         cursor: pointer;
@@ -373,8 +313,8 @@ function injectStylesOnce() {
         gap: 8px;
         padding: 5px 8px;
         border-radius: 6px;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(0,0,0,0.18);
+        border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,0.08));
+        background: var(--black30a, rgba(0,0,0,0.18));
         margin-bottom: 5px;
         min-width: 0;
       }
@@ -401,8 +341,6 @@ function injectStylesOnce() {
         #${SP_PANEL_ID} input[type="text"], #${SP_PANEL_ID} input[type="password"], #${SP_PANEL_ID} input[type="number"],
         #${SP_PANEL_ID} textarea, #${SP_PANEL_ID} select { padding: 10px; font-size: 13px; }
         #${SP_PANEL_ID} label.sp-label { font-size: 12px; }
-        #${SP_PANEL_ID} .sp-preset-row { padding: 5px 6px; font-size: 12px; }
-        #${SP_PANEL_ID} .sp-preset-row-tag { font-size: 10px; }
       }
     `;
     doc.head.appendChild(st2);
@@ -455,7 +393,7 @@ function spIframeBaseCss() {
 const SP_IFRAME_GLOBAL_CSS =
   // 简易 layout scaffold.
   '.spg-card{font:var(--sp-text-size,13px)/1.6 var(--sp-font,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif);' +
-    'color:var(--sp-text-color,rgba(255,255,255,.92));background:rgba(12,14,20,.42);' +
+    'color:var(--sp-text-color,rgba(255,255,255,.92));background:rgba(12,14,20,.88);' +
     'border:1px solid var(--sp-border-color,#7c9cff);border-radius:var(--sp-radius,12px);padding:12px 14px;}\n' +
   '.spg-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}\n' +
   '.spg-title{font-weight:650;letter-spacing:.4px;color:var(--sp-title-color,var(--sp-accent,#7c9cff));}\n' +
